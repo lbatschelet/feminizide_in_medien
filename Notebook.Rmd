@@ -1,0 +1,149 @@
+---
+title: "Feminizide in Medien"
+output: html_notebook
+---
+
+# Setup
+
+```{r setup, include=FALSE}
+# Pakete laden
+library(httr)
+library(jsonlite)
+library(yaml)
+library(dotenv)
+library(R6)
+library(dplyr)
+library(ggplot2)
+
+# API Wrapper laden
+source("swissdox_api.R")
+```
+
+# Swissdox API
+
+```{r api-setup}
+# API Client initialisieren
+client <- SwissdoxAPI$new()
+```
+
+## Kompletter Workflow: Query → Download → Analyse
+
+```{r complete-workflow}
+# Feminizid Query erstellen
+feminizid_query <- create_feminicide_query(
+  sources = c("ZWA", "ZWAS", "BLI", "BZB"),
+  date_from = "2023-01-01",
+  date_to = "2023-03-31",  # Q1 2023 für Test
+  max_results = 100
+)
+
+# Syntax-Test
+test_result <- client$submit_query(
+  query = feminizid_query,
+  name = "Feminizid Syntax Test",
+  test = TRUE
+)
+
+if (test_result$result == "ok") {
+  message("✓ Query-Syntax ist korrekt")
+  
+  # Echte Query senden
+  result <- client$submit_query(
+    query = feminizid_query,
+    name = "Feminizid Medienanalyse Q1 2023_v2",
+    comment = "Analyse der Feminizid-Berichterstattung Q1 2023"
+  )
+  
+  query_id <- result$queryId
+  message("Query gesendet. ID: ", query_id)
+  
+  # Status prüfen und auf Abschluss warten
+  status <- client$get_query_status(query_id)
+  
+  if (status$status %in% c("finished", "completed")) {
+    message("Query bereits abgeschlossen")
+    final_status <- status
+  } else {
+    message("Warte auf Abschluss...")
+    final_status <- client$wait_for_completion(query_id)
+  }
+  
+  # Daten herunterladen
+  if (final_status$status %in% c("finished", "completed") && !is.null(final_status$downloadUrl)) {
+    filename <- basename(final_status$downloadUrl)
+    downloaded_file <- client$download_dataset(filename, file.path("data", filename))
+    
+    # Daten laden
+    media_data <- read.table(downloaded_file, sep = "\t", header = TRUE, 
+                            quote = "", stringsAsFactors = FALSE,
+                            encoding = "UTF-8")
+    
+    # Datum konvertieren
+    media_data$pubtime <- as.POSIXct(media_data$pubtime)
+    media_data$pub_date <- as.Date(media_data$pubtime)
+    
+    message("✓ Daten geladen: ", nrow(media_data), " Artikel")
+    
+    # Erste Einblicke
+    cat("\n=== DATENÜBERSICHT ===\n")
+    cat("Anzahl Artikel:", nrow(media_data), "\n")
+    cat("Zeitraum:", min(media_data$pub_date, na.rm = TRUE), "bis", max(media_data$pub_date, na.rm = TRUE), "\n")
+    cat("Medien:", length(unique(media_data$medium_name)), "verschiedene\n\n")
+    
+    # Top Medien
+    cat("=== TOP MEDIEN ===\n")
+    top_media <- table(media_data$medium_name)
+    print(head(sort(top_media, decreasing = TRUE), 5))
+    
+    # Erste Artikel
+    cat("\n=== ERSTE 3 ARTIKEL ===\n")
+    print(head(media_data[, c("pub_date", "medium_name", "head")], 3))
+    
+  } else {
+    message("Fehler: Keine Download-URL verfügbar oder Query nicht abgeschlossen")
+  }
+} else {
+  message("Query-Syntax fehlerhaft")
+}
+```
+
+## Datenanalyse
+
+```{r analysis}
+if (exists("media_data") && nrow(media_data) > 0) {
+  
+  # Zeitliche Verteilung
+  monthly_counts <- media_data %>%
+    mutate(month = format(pub_date, "%Y-%m")) %>%
+    count(month) %>%
+    arrange(month)
+  
+  # Plot erstellen
+  p1 <- ggplot(monthly_counts, aes(x = month, y = n)) +
+    geom_col(fill = "steelblue", alpha = 0.7) +
+    theme_minimal() +
+    labs(title = "Feminizid-Berichterstattung Q1 2023",
+         subtitle = paste("Gesamt:", sum(monthly_counts$n), "Artikel"),
+         x = "Monat", y = "Anzahl Artikel") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  print(p1)
+  
+  # Medien-Verteilung
+  media_counts <- media_data %>%
+    count(medium_name, sort = TRUE) %>%
+    head(10)
+  
+  p2 <- ggplot(media_counts, aes(x = reorder(medium_name, n), y = n)) +
+    geom_col(fill = "coral", alpha = 0.7) +
+    coord_flip() +
+    theme_minimal() +
+    labs(title = "Top 10 Medien",
+         x = "Medium", y = "Anzahl Artikel")
+  
+  print(p2)
+  
+} else {
+  message("Keine Daten für Analyse verfügbar")
+}
+```
