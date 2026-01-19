@@ -12,7 +12,16 @@ R ausgewertet werden könn(t)en.
 Detail.
 Die Swissdox@LiRI API wird über R abgerufen. Sollte dies funktionieren, verzichten wir auf Webscraping/Datamining. Der API werden einerseits
 rohe Textdaten, mit denen linguistische Analysen vorgenommen werden können,
-und andererseits Metadaten entnommen, damit 
+und andererseits Metadaten entnommen, damit die Daten sinnvoll gefiltert
+werden können.
 
 
 Meeting Minutes (19.01.2026, 14:00):
+
+- Bericht
+    Umfang und Tiefe
+    technische Anforderungen
+
+- Code
+    nur API
+    Analysen optional?
