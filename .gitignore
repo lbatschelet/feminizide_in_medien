@@ -90,3 +90,14 @@ rsconnect/
 /*_files/
 
 # End of https://www.toptal.com/developers/gitignore/api/r,macos
+
+# Lokale Umgebungsvariablen und Secrets
+local.env
+.env.local
+
+# Daten-Verzeichnis (heruntergeladene Datensätze)
+data/
+*.tsv
+*.tsv.xz
+*.csv
+*.csv.gz
