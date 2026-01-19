@@ -21,7 +21,38 @@ Meeting Minutes (19.01.2026, 14:00):
 - Bericht
     Umfang und Tiefe
     technische Anforderungen
-
+    -> "es wäre spannend gewesen, die Berichterstattung gegen
+    die tatsächlichen (offiziellen) Daten abzugelichen, doch
+    das ist nicht möglich"
+    -> es existieren Guerillia/open-intelligence seiten, doch 
+    auch diese Daten sind (natürlich) unvollständig.
+    stopfemizid.ch 
+    -> Ethik dahinter
+ 
 - Code
-    nur API
-    Analysen optional?
+    nur API: limits, dokumentation, etc.
+    Analysen: wird Wert darauf gelegt
+    Begriffe, etc.
+    eigene Analysen erforschen
+    similarity analysen, co-ocurrence
+
+    Pre-processing:
+    wordtovec (max. 100 dimensionen)
+    was ist in der Nähe von was?
+    evtl. racism und sexism (synonym) dictionary
+    Netzwerk-Analyse
+    2 to 1 node projection (evtl. weniger interessant)
+    'ownership' über Begriffe
+
+
+- Daten (insb. Aufbereitung)
+    Deutsch; cleaning
+    haben wir alle 'Begriffe' erfasst?
+    machen wir mehrere Loops?
+    wie machen wir die Filterung?
+
+    wie erfassen wird das Phänomen im letzten Jahrhundert?
+    wurde darüber berichtet?
+    in welchem Umfang?
+
+    doppelte Artikel wegen Zentralredaktionen
