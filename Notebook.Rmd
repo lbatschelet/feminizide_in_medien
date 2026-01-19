@@ -11,6 +11,18 @@ library(jsonlite)
 library(yaml)
 library(dotenv)
 library(R6)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(tidytext)
+library(readr)
+library(tidyr)
+library(quanteda)
+library(quanteda.textplots)
+library(tm)
+library(topicmodels)
+library(wordcloud)
+library(RColorBrewer)
 
 # API Wrapper laden
 source("swissdox_api.R")
@@ -19,126 +31,487 @@ source("swissdox_api.R")
 # Datenerhebung: Feminizide und Familiendrama
 
 ```{r api-setup}
-# API Client initialisieren
-client <- SwissdoxAPI$new()
+# API Client mit Credentials initialisieren
+client <- SwissdoxAPI$new(
+  api_key = Sys.getenv("SWISSDOX_API_KEY"),
+  api_secret = Sys.getenv("SWISSDOX_API_SECRET")
+)
 ```
 
 ## Query für Feminizid-Berichterstattung
 
 ```{r feminizid-data-collection}
-# Erweiterte Query für alle relevanten Begriffe
-feminizid_query <- '
-query:
-  dates:
-    - from: 2000-01-01
-      to: 2023-12-31
-  languages:
-    - de
-    - fr
-  content:
-    OR:
-      - Feminizid
-      - Femizid
-      - Frauenmord
-      - Femicide
-      - Familiendrama
-      - "häusliche Gewalt"
-      - "Partnerschaftsgewalt"
-      - "Gewalt gegen Frauen"
-      - "Tötung von Frau"
-      - "Mord an Frau"
-      - "Beziehungstat"
-      - "Ehestreit"
-      - "Familientragödie"
-result:
-  format: TSV
-  maxResults: 10000000
-  columns:
-    - id
-    - pubtime
-    - medium_code
-    - medium_name
-    - rubric
-    - regional
-    - doctype
-    - doctype_description
-    - language
-    - char_count
-    - dateline
-    - head
-    - subhead
-    - article_link
-    - content_id
-    - content
-version: 1.2
-'
-
-# Eindeutigen Query-Namen mit Timestamp erstellen
-query_name <- paste("Feminizid_Familiendrama_2023", format(Sys.time(), "%Y%m%d_%H%M%S"), sep = "_")
-
-# Syntax-Test
-test_result <- client$submit_query(
-  query = feminizid_query,
-  name = paste(query_name, "TEST", sep = "_"),
-  test = TRUE
+# Feminizid-Keywords definieren (zentrale Definition)
+feminizid_keywords <- c(
+  "Feminizid", "Femizid", "Frauenmord", "Femicide",
+  "Familiendrama", "Familientragödie", "Beziehungstat", "Ehestreit",
+  "häusliche Gewalt", "Partnerschaftsgewalt", "Gewalt gegen Frauen",
+  "Tötung von Frau", "Mord an Frau", "Partnergewalt", "Beziehungsgewalt"
 )
 
-if (test_result$result == "ok") {
-  message("✓ Query-Syntax ist korrekt")
+# Vollständige Datenerhebung mit API-Wrapper
+collection_result <- execute_swissdox_workflow(
+  client = client,
+  query = create_swissdox_query(
+    content_terms = feminizid_keywords,
+    date_from = "2000-01-01",
+    date_to = format(Sys.Date(), "%Y-%m-%d"),
+    languages = "de",
+    max_results = 1000000L,
+    columns = c("id", "pubtime", "medium_code", "medium_name", "rubric",
+               "regional", "doctype", "doctype_description", "language", 
+               "char_count", "dateline", "head", "subhead", 
+               "article_link", "content_id", "content")
+  ),
+  name = paste("Feminizid_Collection", format(Sys.time(), "%Y%m%d_%H%M%S")),
+  comment = "Comprehensive feminicide media analysis dataset",
+  return_data = TRUE,
+  output_dir = "data"
+)
+
+# Daten verfügbar machen und speichern
+if (!is.null(collection_result$data)) {
+  media_data <- collection_result$data
   
-  # Echte Query senden
-  result <- client$submit_query(
-    query = feminizid_query,
-    name = query_name,
-    comment = "Vollständige Erhebung: Feminizide, Familiendrama und häusliche Gewalt 2023"
-  )
+  # Rohdaten speichern
+  raw_data_file <- paste0("data/feminizid_raw_data_", format(Sys.Date(), "%Y%m%d"), ".rds")
+  saveRDS(media_data, raw_data_file)
   
-  query_id <- result$queryId
-  message("Query gesendet. ID: ", query_id)
-  message("Query Name: ", query_name)
+  message("✓ ", collection_result$message)
+  message("✓ Rohdaten gespeichert: ", raw_data_file)
+} else {
+  message("Fehler beim Laden der Daten")
+}
+```
+
+## Datenübersicht und Aufbereitung
+
+```{r data-preparation}
+# Daten laden (falls bereits vorhanden) oder aufbereiten
+raw_data_file <- paste0("data/feminizid_raw_data_", format(Sys.Date(), "%Y%m%d"), ".rds")
+
+if (!exists("media_data") && file.exists(raw_data_file)) {
+  message("Lade gespeicherte Rohdaten...")
+  media_data <- readRDS(raw_data_file)
+  message("✓ Rohdaten geladen: ", nrow(media_data), " Artikel")
+}
+
+# Daten aufbereiten (falls noch nicht geschehen)
+if (exists("media_data")) {
+  # Datum konvertieren und zusätzliche Zeitvariablen erstellen
+  media_data$pubtime <- as.POSIXct(media_data$pubtime)
+  media_data$pub_date <- as.Date(media_data$pubtime)
+  media_data$year <- format(media_data$pub_date, "%Y")
+  media_data$month <- format(media_data$pub_date, "%m")
+  media_data$month_year <- format(media_data$pub_date, "%Y-%m")
   
-  # Status prüfen
-  status <- client$get_query_status(query_id)
+  # Nur deutsche Artikel (französische rausfiltern)
+  media_data <- media_data %>%
+    filter(language == "de") %>%
+    filter(!is.na(content), content != "", nchar(content) > 50)
   
-  if (status$status %in% c("finished", "completed")) {
-    message("✓ Query bereits abgeschlossen")
-    message("Gefundene Artikel: ", status$actualResults)
+  message("Deutsche Artikel nach Filterung: ", nrow(media_data))
+  message("Zeitraum: ", min(media_data$pub_date, na.rm = TRUE), " bis ", max(media_data$pub_date, na.rm = TRUE))
+  message("Medien: ", length(unique(media_data$medium_name)))
+} else {
+  message("Keine Daten verfügbar - führen Sie zuerst die Datenerhebung aus")
+}
+```
+
+```{r overview-analysis}
+if (exists("media_data")) {
+  
+  # 1. Artikel pro Jahr
+  yearly_counts <- media_data %>%
+    count(year) %>%
+    filter(!is.na(year), year >= 2000, year <= 2026)
+  
+  p1 <- ggplot(yearly_counts, aes(x = as.numeric(year), y = n)) +
+    geom_col(fill = "steelblue", alpha = 0.7) +
+    theme_minimal() +
+    labs(title = "Feminizid-Berichterstattung über Zeit", 
+         subtitle = "Deutsche Medien 2000-2026",
+         x = "Jahr", y = "Anzahl Artikel") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  # 2. Top Medien
+  top_media <- media_data %>%
+    count(medium_name, sort = TRUE) %>%
+    head(15)
+  
+  p2 <- ggplot(top_media, aes(x = reorder(medium_name, n), y = n)) +
+    geom_col(fill = "coral", alpha = 0.7) +
+    coord_flip() +
+    theme_minimal() +
+    labs(title = "Top 15 Medien", x = "Medium", y = "Anzahl Artikel")
+  
+  # 3. Monatlicher Trend (letzte 5 Jahre)
+  recent_trend <- media_data %>%
+    filter(year >= 2020) %>%
+    count(month_year) %>%
+    arrange(month_year)
+  
+  p3 <- ggplot(recent_trend, aes(x = month_year, y = n)) +
+    geom_line(group = 1, color = "darkgreen", size = 1) +
+    geom_point(color = "darkgreen", size = 1.5) +
+    theme_minimal() +
+    labs(title = "Monatlicher Trend 2020-2026", x = "Monat", y = "Anzahl Artikel") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 8))
+  
+  print(p1)
+  print(p2) 
+  print(p3)
+  
+  # Zusammenfassung
+  cat("\n=== DATENÜBERSICHT ===\n")
+  cat("Deutsche Artikel:", nrow(media_data), "\n")
+  cat("Zeitraum:", min(media_data$pub_date, na.rm = TRUE), "bis", max(media_data$pub_date, na.rm = TRUE), "\n")
+  cat("Medien:", length(unique(media_data$medium_name)), "\n")
+  cat("Durchschnitt/Jahr:", round(nrow(media_data) / length(unique(media_data$year))), "\n")
+}
+```
+
+```{r keyword-analysis}
+if (exists("media_data")) {
+  
+  # Keyword-Häufigkeit in Headlines (verwende zentrale Definition)
+  keyword_counts <- data.frame(keyword = character(), count = numeric())
+  
+  for (kw in feminizid_keywords) {
+    count <- sum(str_detect(media_data$head, regex(kw, ignore_case = TRUE)), na.rm = TRUE)
+    keyword_counts <- rbind(keyword_counts, data.frame(keyword = kw, count = count))
+  }
+  
+  keyword_counts <- keyword_counts %>%
+    filter(count > 0) %>%
+    arrange(desc(count))
+  
+  p4 <- ggplot(keyword_counts, aes(x = reorder(keyword, count), y = count)) +
+    geom_col(fill = "darkred", alpha = 0.7) +
+    coord_flip() +
+    theme_minimal() +
+    labs(title = "Keyword-Häufigkeit in Schlagzeilen", 
+         x = "Keyword", y = "Anzahl Artikel")
+  
+  print(p4)
+  
+  # Top Keywords ausgeben
+  cat("\n=== KEYWORD-HÄUFIGKEIT ===\n")
+  print(keyword_counts)
+}
+```
+
+```{r time-trends}
+if (exists("media_data")) {
+  
+  # Zeittrends für Keywords (verwende zentrale Definition)
+  keyword_timeline <- data.frame()
+  
+  for (kw in feminizid_keywords) {
+    yearly_kw <- media_data %>%
+      filter(!is.na(year), !is.na(head)) %>%
+      mutate(has_keyword = str_detect(head, regex(kw, ignore_case = TRUE))) %>%
+      group_by(year) %>%
+      summarise(
+        total_articles = n(),
+        keyword_articles = sum(has_keyword, na.rm = TRUE),
+        percentage = (keyword_articles / total_articles) * 100,
+        .groups = 'drop'
+      ) %>%
+      mutate(keyword = kw)
     
-    # Daten herunterladen
-    if (!is.null(status$downloadUrl)) {
-      filename <- basename(status$downloadUrl)
-      downloaded_file <- client$download_dataset(filename, file.path("data", filename))
-      
-      # Daten laden
-      media_data <- read.table(downloaded_file, sep = "\t", header = TRUE, 
-                              quote = "", stringsAsFactors = FALSE,
-                              encoding = "UTF-8")
-      
-      # Datum konvertieren
-      media_data$pubtime <- as.POSIXct(media_data$pubtime)
-      media_data$pub_date <- as.Date(media_data$pubtime)
-      
-      # Datenübersicht
-      cat("\n=== DATENERHEBUNG ABGESCHLOSSEN ===\n")
-      cat("Datei:", downloaded_file, "\n")
-      cat("Anzahl Artikel:", nrow(media_data), "\n")
-      cat("Zeitraum:", min(media_data$pub_date, na.rm = TRUE), "bis", max(media_data$pub_date, na.rm = TRUE), "\n")
-      cat("Medien:", length(unique(media_data$medium_name)), "verschiedene\n")
-      cat("Sprachen:", paste(unique(media_data$language), collapse = ", "), "\n")
-      
-      # Speichere Query-ID für Referenz
-      cat("Query-ID für Referenz:", query_id, "\n")
-      
-    } else {
-      message("Fehler: Keine Download-URL verfügbar")
-    }
-    
+    keyword_timeline <- bind_rows(keyword_timeline, yearly_kw)
+  }
+  
+  # Nur relevante Keywords und Jahre
+  keyword_timeline <- keyword_timeline %>%
+    filter(year >= 2000, year <= 2026) %>%
+    group_by(keyword) %>%
+    filter(sum(keyword_articles) > 10) %>%  # Mindestens 10 Artikel insgesamt
+    ungroup()
+  
+  # Absolute Zahlen über Zeit
+  p5 <- ggplot(keyword_timeline, aes(x = as.numeric(year), y = keyword_articles, color = keyword)) +
+    geom_line(size = 1, alpha = 0.8) +
+    geom_point(size = 1.5, alpha = 0.7) +
+    theme_minimal() +
+    labs(title = "Zeittrends: Keyword-Verwendung in Schlagzeilen",
+         subtitle = "Absolute Anzahl Artikel pro Jahr",
+         x = "Jahr", y = "Anzahl Artikel", color = "Keyword") +
+    theme(legend.position = "bottom", legend.text = element_text(size = 8)) +
+    guides(color = guide_legend(ncol = 2))
+  
+  # Heatmap: Keywords x Jahre
+  keyword_matrix <- keyword_timeline %>%
+    select(year, keyword, keyword_articles) %>%
+    pivot_wider(names_from = keyword, values_from = keyword_articles, values_fill = 0) %>%
+    pivot_longer(-year, names_to = "keyword", values_to = "count")
+  
+  p6 <- ggplot(keyword_matrix, aes(x = as.numeric(year), y = keyword, fill = count)) +
+    geom_tile(color = "white", size = 0.1) +
+    scale_fill_gradient(low = "white", high = "darkred", name = "Artikel") +
+    theme_minimal() +
+    labs(title = "Keyword-Intensität über Zeit", x = "Jahr", y = "Keyword") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          axis.text.y = element_text(size = 9))
+  
+  print(p5)
+  print(p6)
+  
+  # Wichtigste Trends
+  cat("\n=== ZEITTREND-ANALYSE ===\n")
+  trend_summary <- keyword_timeline %>%
+    group_by(keyword) %>%
+    summarise(
+      total_articles = sum(keyword_articles),
+      peak_year = year[which.max(keyword_articles)],
+      peak_count = max(keyword_articles),
+      .groups = 'drop'
+    ) %>%
+    arrange(desc(total_articles))
+  
+  print(trend_summary)
+}
+```
+
+## Textkorpus und Preprocessing
+
+```{r corpus-setup}
+if (exists("media_data")) {
+  
+  # Daten für Korpus vorbereiten
+  corpus_data <- media_data %>%
+    distinct(id, .keep_all = TRUE) %>%  # Duplikate entfernen
+    filter(!is.na(content), content != "", nchar(content) > 100) %>%  # Mindestlänge
+    mutate(unique_id = paste0("doc_", row_number()))  # Eindeutige IDs
+  
+  message("Artikel für Korpus: ", nrow(corpus_data))
+  
+} else {
+  message("Keine Daten für Korpus verfügbar")
+}
+```
+
+```{r create-corpus}
+# Korpus laden (falls bereits vorhanden)
+corpus_file <- paste0("data/feminizid_corpus_", format(Sys.Date(), "%Y%m%d"), ".rds")
+dfm_file <- paste0("data/feminizid_dfm_", format(Sys.Date(), "%Y%m%d"), ".rds")
+
+if (!exists("feminizid_corpus") && file.exists(corpus_file)) {
+  message("Lade gespeicherten Korpus...")
+  feminizid_corpus <- readRDS(corpus_file)
+  message("✓ Korpus geladen: ", ndoc(feminizid_corpus), " Dokumente")
+}
+
+if (!exists("feminizid_dfm_trimmed") && file.exists(dfm_file)) {
+  message("Lade gespeicherte DFM...")
+  feminizid_dfm_trimmed <- readRDS(dfm_file)
+  message("✓ DFM geladen: ", nfeat(feminizid_dfm_trimmed), " Features")
+}
+
+# Korpus erstellen (falls noch nicht vorhanden)
+if (exists("corpus_data") && !exists("feminizid_corpus")) {
+  
+  # Text bereinigen
+  corpus_data$clean_content <- corpus_data$content %>%
+    str_remove_all("<[^>]+>") %>%  # HTML-Tags
+    str_remove_all("\\n|\\t|\\r") %>%  # Zeilenumbrüche
+    str_remove_all("https?://\\S+") %>%  # URLs
+    str_squish()  # Mehrfache Leerzeichen
+  
+  # Finale Filterung
+  corpus_data <- corpus_data %>%
+    filter(!is.na(clean_content), clean_content != "", nchar(clean_content) > 50)
+  
+  # Quanteda Korpus erstellen
+  feminizid_corpus <- corpus(corpus_data, 
+                            text_field = "clean_content",
+                            docid_field = "unique_id")
+  
+  # Metadaten hinzufügen
+  docvars(feminizid_corpus, "original_id") <- corpus_data$id
+  docvars(feminizid_corpus, "medium") <- corpus_data$medium_name
+  docvars(feminizid_corpus, "date") <- corpus_data$pub_date
+  docvars(feminizid_corpus, "year") <- corpus_data$year
+  docvars(feminizid_corpus, "headline") <- corpus_data$head
+  docvars(feminizid_corpus, "char_count") <- as.numeric(corpus_data$char_count)
+  
+  # Korpus-Übersicht
+  cat("=== QUANTEDA KORPUS ===\n")
+  cat("Dokumente:", ndoc(feminizid_corpus), "\n")
+  cat("Tokens:", sum(ntoken(feminizid_corpus)), "\n")
+  cat("Zeitraum:", min(corpus_data$pub_date, na.rm = TRUE), "bis", max(corpus_data$pub_date, na.rm = TRUE), "\n")
+  
+  print(summary(feminizid_corpus, n = 3))
+}
+```
+
+```{r load-existing-dfm}
+# Gespeicherte DFM laden (falls vorhanden)
+corpus_file <- paste0("data/feminizid_corpus_", format(Sys.Date(), "%Y%m%d"), ".rds")
+dfm_file <- paste0("data/feminizid_dfm_", format(Sys.Date(), "%Y%m%d"), ".rds")
+
+if (file.exists(dfm_file)) {
+  message("Lade gespeicherte DFM...")
+  start_time <- Sys.time()
+  feminizid_dfm_trimmed <- readRDS(dfm_file)
+  load_time <- round(as.numeric(Sys.time() - start_time), 1)
+  
+  message("✓ DFM geladen: ", nfeat(feminizid_dfm_trimmed), " Features (", load_time, "s)")
+  
+  # Zeige Info
+  cat("=== GELADENE DFM ===\n")
+  cat("Features:", nfeat(feminizid_dfm_trimmed), "\n")
+  cat("Dokumente:", ndoc(feminizid_dfm_trimmed), "\n")
+  cat("Sparsity:", round(sparsity(feminizid_dfm_trimmed), 3), "\n")
+  cat("Dateigröße:", round(file.size(dfm_file) / 1024^2, 1), "MB\n")
+} else {
+  message("Keine gespeicherte DFM gefunden - führen Sie text-preprocessing aus")
+}
+```
+
+```{r text-preprocessing}
+# Text-Preprocessing (kann immer ausgeführt werden)
+if (exists("feminizid_corpus")) {
+  
+  # Deutsche Stoppwörter laden
+  german_stopwords <- readLines("german_stopwords_full.txt", encoding = "UTF-8")
+  german_stopwords <- german_stopwords[german_stopwords != ""]
+  
+  # Medienspezifische Stoppwörter
+  media_stopwords <- c("uhr", "jahr", "jahre", "jahren", "prozent", "franken", "chf",
+                      "artikel", "bericht", "zeitung", "medium", "redaktion", "autor",
+                      "quelle", "foto", "bild", "video", "online", "www", "http",
+                      "montag", "dienstag", "mittwoch", "donnerstag", "freitag", 
+                      "samstag", "sonntag", "januar", "februar", "märz", "april",
+                      "mai", "juni", "juli", "august", "september", "oktober",
+                      "november", "dezember", "schweiz", "schweizer", "schweizerin")
+  
+  all_stopwords <- c(german_stopwords, media_stopwords)
+  
+  # Tokenisierung und Preprocessing
+  feminizid_tokens <- tokens(feminizid_corpus,
+                            remove_punct = TRUE,
+                            remove_symbols = TRUE,
+                            remove_numbers = TRUE,
+                            remove_url = TRUE) %>%
+    tokens_tolower() %>%
+    tokens_remove(all_stopwords, min_nchar = 3)
+  
+  # Document-Feature-Matrix
+  feminizid_dfm <- dfm(feminizid_tokens)
+  
+  # Trimming: Konsistente Parameter (beide als Proportionen)
+  # Basierend auf quanteda Dokumentation: https://quanteda.io/reference/dfm_trim.html
+  feminizid_dfm_trimmed <- dfm_trim(feminizid_dfm, 
+                                   min_docfreq = 0.0003,  # Min. 0.03% (~11 Dokumente bei 35k)
+                                   max_docfreq = 0.90,    # Max. 90% der Dokumente
+                                   docfreq_type = "prop")  # Beide als Proportionen
+  
+  cat("=== TEXT-PREPROCESSING ===\n")
+  cat("Dokumente:", ndoc(feminizid_dfm), "\n")
+  cat("Original Features:", nfeat(feminizid_dfm), "\n")
+  cat("Nach Trimming:", nfeat(feminizid_dfm_trimmed), "\n")
+  cat("Sparsity:", round(sparsity(feminizid_dfm_trimmed), 3), "\n")
+  
+  # Häufigste Wörter
+  if (nfeat(feminizid_dfm_trimmed) > 0) {
+    top_features <- topfeatures(feminizid_dfm_trimmed, 25)
+    cat("\n=== HÄUFIGSTE WÖRTER ===\n")
+    print(top_features)
   } else {
-    message("Query läuft noch. Status: ", status$status)
-    message("Verwenden Sie client$wait_for_completion('", query_id, "') um zu warten")
+    cat("\n⚠️ Keine Features nach Trimming - Parameter anpassen!\n")
   }
   
 } else {
-  message("Query-Syntax fehlerhaft")
+  message("Kein Korpus verfügbar - führen Sie create-corpus aus")
 }
+```
+
+```{r save-dfm}
+# DFM speichern (nur wenn erfolgreich erstellt) - optimiert für große Objekte
+if (exists("feminizid_dfm_trimmed") && nfeat(feminizid_dfm_trimmed) > 0) {
+  corpus_file <- paste0("data/feminizid_corpus_", format(Sys.Date(), "%Y%m%d"), ".rds")
+  dfm_file <- paste0("data/feminizid_dfm_", format(Sys.Date(), "%Y%m%d"), ".rds")
+  
+  # Optimiertes Speichern mit Kompression
+  # Option 1: Vollständiges Speichern (langsam, aber komplett)
+  if (FALSE) {  # Auf TRUE setzen wenn vollständiges Speichern gewünscht
+    message("Speichere Korpus (kann einige Minuten dauern)...")
+    saveRDS(feminizid_corpus, corpus_file, compress = "xz")
+    
+    message("Speichere DFM (kann einige Minuten dauern)...")
+    saveRDS(feminizid_dfm_trimmed, dfm_file, compress = "xz")
+  }
+  
+  # Option 2: Nur DFM speichern (schneller, für Analyse ausreichend)
+  message("Speichere nur DFM (schneller)...")
+  saveRDS(feminizid_dfm_trimmed, dfm_file, compress = "xz")
+  
+  # Dateigröße anzeigen
+  corpus_size <- round(file.size(corpus_file) / 1024^2, 1)
+  dfm_size <- round(file.size(dfm_file) / 1024^2, 1)
+  
+  message("✓ Korpus gespeichert: ", corpus_file, " (", corpus_size, " MB)")
+  message("✓ DFM gespeichert: ", dfm_file, " (", dfm_size, " MB)")
+  
+  # Speicher-Info
+  cat("Objekt-Größen im Speicher:\n")
+  cat("Korpus:", round(object.size(feminizid_corpus) / 1024^2, 1), "MB\n")
+  cat("DFM:", round(object.size(feminizid_dfm_trimmed) / 1024^2, 1), "MB\n")
+  
+} else {
+  message("Keine DFM zum Speichern verfügbar")
+}
+```
+
+```{r visualization}
+if (exists("feminizid_dfm_trimmed")) {
+  
+  # Wordcloud der häufigsten Begriffe
+  set.seed(123)
+  
+  # Versuche quanteda.textplots, falls nicht verfügbar verwende wordcloud
+  if ("textplot_wordcloud" %in% ls("package:quanteda.textplots")) {
+    textplot_wordcloud(feminizid_dfm_trimmed, 
+                      min_count = 30,
+                      max_words = 100,
+                      color = brewer.pal(8, "Dark2"))
+  } else {
+    # Alternative mit wordcloud package
+    freq_data <- topfeatures(feminizid_dfm_trimmed, 100)
+    wordcloud(names(freq_data), freq_data, 
+             min.freq = 30, max.words = 100,
+             colors = brewer.pal(8, "Dark2"),
+             random.order = FALSE)
+  }
+  
+  # Feature-Häufigkeit über Zeit
+  if (exists("feminizid_corpus")) {
+    # Top 10 Features nach Jahren
+    top_terms <- names(topfeatures(feminizid_dfm_trimmed, 10))
+    
+     # Häufigkeit dieser Terms über Jahre
+     yearly_terms <- dfm_group(feminizid_dfm_trimmed, groups = docvars(feminizid_dfm_trimmed, "year"))
+     
+     # Korrekte Konvertierung für quanteda 3.0+ - ohne doc_id Spalte
+     term_data <- convert(yearly_terms[, top_terms], to = "data.frame") %>%
+       select(-doc_id) %>%  # doc_id Spalte entfernen
+       mutate(year = as.numeric(rownames(yearly_terms)))
+     
+     term_timeline <- term_data %>%
+       pivot_longer(-year, names_to = "term", values_to = "frequency") %>%
+       filter(year >= 2000, year <= 2026)
+    
+    p7 <- ggplot(term_timeline, aes(x = year, y = frequency, color = term)) +
+      geom_line(size = 1, alpha = 0.8) +
+      theme_minimal() +
+      labs(title = "Häufigste Begriffe über Zeit", 
+           x = "Jahr", y = "Häufigkeit", color = "Begriff") +
+      theme(legend.position = "bottom")
+    
+    print(p7)
+  }
+}
+```
 ```
