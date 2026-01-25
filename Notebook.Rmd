@@ -100,6 +100,13 @@ simplified_patterns <- list(
   c("opf", "schutz"),
   c("gewalt", "schutz")
 )
+
+feminizid_keywords <- c(
+  "Feminizid", "Femizid", "Frauenmord", "Femicide",
+  "Familiendrama", "Familientrag\u00f6die", "Beziehungstat", "Ehestreit",
+  "h\u00e4usliche Gewalt", "Partnerschaftsgewalt", "Gewalt gegen Frauen",
+  "T\u00f6tung von Frau", "Mord an Frau", "Partnergewalt", "Beziehungsgewalt"
+)
 ```
 
 ## Data collection
@@ -113,16 +120,6 @@ load_checkpoint("feminizid_raw_data", "media_data")
 ```
 
 ```{r feminizid-data-collection}
-# Keyword list (central definition)
-feminizid_keywords <- c(
-  "Feminizid", "Femizid", "Frauenmord", "Femicide",
-  "Familiendrama", "Familientrag\u00f6die", "Beziehungstat", "Ehestreit",
-  "h\u00e4usliche Gewalt", "Partnerschaftsgewalt", "Gewalt gegen Frauen",
-  "T\u00f6tung von Frau", "Mord an Frau", "Partnergewalt", "Beziehungsgewalt"
-)
-```
-
-```{r execute-collection}
 # Vollst\u00e4ndige Datenerhebung mit API-Wrapper
 collection_result <- execute_swissdox_workflow(
   client = client,
@@ -426,80 +423,78 @@ if (!exists("feminizid_corpus")) {
 
 ```{r text-preprocessing}
 stopifnot(exists("feminizid_corpus"))
-  
-  # Deutsche Stoppw\u00f6rter laden
-  german_stopwords <- readLines("german_stopwords_full.txt", encoding = "UTF-8")
-  german_stopwords <- german_stopwords[german_stopwords != ""]
-  
-  # Medienspezifische Stoppw\u00f6rter
-  media_stopwords <- c("uhr", "jahr", "jahre", "jahren", "prozent", "franken", "chf",
-                      "artikel", "bericht", "zeitung", "medium", "redaktion", "autor",
-                      "quelle", "foto", "bild", "video", "online", "www", "http",
-                      "montag", "dienstag", "mittwoch", "donnerstag", "freitag",
-                      "samstag", "sonntag", "januar", "februar", "m\u00e4rz", "april",
-                      "mai", "juni", "juli", "august", "september", "oktober",
-                      "november", "dezember", "schweiz", "schweizer", "schweizerin")
-  
-  all_stopwords <- c(german_stopwords, media_stopwords)
-  
-  
-  # Tokenisierung und Preprocessing
-  feminizid_tokens <- tokens(feminizid_corpus,
-                            remove_punct = TRUE,
-                            remove_symbols = TRUE,
-                            remove_numbers = TRUE,
-                            remove_url = TRUE) %>%
-    tokens_tolower() %>%
-    tokens_remove(all_stopwords, min_nchar = 3)
-  
-  # Stemming (optional)
-  if (USE_STEMMING) {
-    feminizid_tokens <- tokens_wordstem(feminizid_tokens, language = "de")
-  }
-  
-  # DANN Multi-Word-Expressions (jetzt mit Grundformen)
-  # Vereinfachte Patterns - nur Grundformen n\u00f6tig
-  # Uses simplified_patterns defined in text-config
-  
-  # Multi-Word-Expressions zu Compound-Tokens zusammenfassen
-  for (pattern in simplified_patterns) {
-    feminizid_tokens <- tokens_compound(feminizid_tokens, 
-                                       pattern = phrase(paste(pattern, collapse = " ")),
-                                       concatenator = "_")
-  }
-  
-  cat("=== TEXT-PREPROCESSING SCHRITTE ===\n")
-  cat("1. ERST Stemming: Flexionsformen reduziert\n")
-  cat("   h\u00e4usliche/h\u00e4uslicher \u2192 h\u00e4usl, t\u00f6tung \u2192 t\u00f6t, frauen \u2192 frau\n")
-  cat("2. DANN Multi-Word-Expressions:", length(simplified_patterns), "Wortpaare\n")
-  cat("   h\u00e4usl + gewalt \u2192 h\u00e4usl_gewalt (erfasst ALLE Flexionsformen!)\n")
-  cat("3. Vorteil: Ein Pattern erfasst alle Varianten!\n")
-  
-  # Document-Feature-Matrix
-  feminizid_dfm <- dfm(feminizid_tokens)
-  
-  # Trimming: Konsistente Parameter (beide als Proportionen)
-  # Basierend auf quanteda Dokumentation: https://quanteda.io/reference/dfm_trim.html
-  feminizid_dfm_trimmed <- dfm_trim(feminizid_dfm, 
-                                   min_docfreq = 0.0003,  # Min. 0.03% (~11 Dokumente bei 35k)
-                                   max_docfreq = 0.90,    # Max. 90% der Dokumente
-                                   docfreq_type = "prop")  # Beide als Proportionen
-  
-  cat("=== TEXT-PREPROCESSING ===\n")
-  cat("Dokumente:", ndoc(feminizid_dfm), "\n")
-  cat("Original Features:", nfeat(feminizid_dfm), "\n")
-  cat("Nach Trimming:", nfeat(feminizid_dfm_trimmed), "\n")
-  cat("Sparsity:", round(sparsity(feminizid_dfm_trimmed), 3), "\n")
-  
-  # H\u00e4ufigste W\u00f6rter
-  if (nfeat(feminizid_dfm_trimmed) > 0) {
-    top_features <- topfeatures(feminizid_dfm_trimmed, 25)
-    cat("\n=== H\u00c4UFIGSTE W\u00d6RTER ===\n")
-    print(top_features)
-  } else {
-    cat("\nWARN: Keine Features nach Trimming - Parameter anpassen!\n")
-  }
-  
+
+# Deutsche Stoppw\u00f6rter laden
+german_stopwords <- readLines("german_stopwords_full.txt", encoding = "UTF-8")
+german_stopwords <- german_stopwords[german_stopwords != ""]
+
+# Medienspezifische Stoppw\u00f6rter
+media_stopwords <- c("uhr", "jahr", "jahre", "jahren", "prozent", "franken", "chf",
+                    "artikel", "bericht", "zeitung", "medium", "redaktion", "autor",
+                    "quelle", "foto", "bild", "video", "online", "www", "http",
+                    "montag", "dienstag", "mittwoch", "donnerstag", "freitag",
+                    "samstag", "sonntag", "januar", "februar", "m\u00e4rz", "april",
+                    "mai", "juni", "juli", "august", "september", "oktober",
+                    "november", "dezember", "schweiz", "schweizer", "schweizerin")
+
+all_stopwords <- c(german_stopwords, media_stopwords)
+
+
+# Tokenisierung und Preprocessing
+feminizid_tokens <- tokens(feminizid_corpus,
+                          remove_punct = TRUE,
+                          remove_symbols = TRUE,
+                          remove_numbers = TRUE,
+                          remove_url = TRUE) %>%
+  tokens_tolower() %>%
+  tokens_remove(all_stopwords, min_nchar = 3)
+
+# Stemming (optional)
+if (USE_STEMMING) {
+  feminizid_tokens <- tokens_wordstem(feminizid_tokens, language = "de")
+}
+
+# DANN Multi-Word-Expressions (jetzt mit Grundformen)
+# Vereinfachte Patterns - nur Grundformen n\u00f6tig
+# Uses simplified_patterns defined in text-config
+
+# Multi-Word-Expressions zu Compound-Tokens zusammenfassen
+for (pattern in simplified_patterns) {
+  feminizid_tokens <- tokens_compound(feminizid_tokens, 
+                                      pattern = phrase(paste(pattern, collapse = " ")),
+                                      concatenator = "_")
+}
+
+cat("=== TEXT-PREPROCESSING SCHRITTE ===\n")
+cat("1. ERST Stemming: Flexionsformen reduziert\n")
+cat("   h\u00e4usliche/h\u00e4uslicher \u2192 h\u00e4usl, t\u00f6tung \u2192 t\u00f6t, frauen \u2192 frau\n")
+cat("2. DANN Multi-Word-Expressions:", length(simplified_patterns), "Wortpaare\n")
+cat("   h\u00e4usl + gewalt \u2192 h\u00e4usl_gewalt (erfasst ALLE Flexionsformen!)\n")
+cat("3. Vorteil: Ein Pattern erfasst alle Varianten!\n")
+
+# Document-Feature-Matrix
+feminizid_dfm <- dfm(feminizid_tokens)
+
+# Trimming: Konsistente Parameter (beide als Proportionen)
+# Basierend auf quanteda Dokumentation: https://quanteda.io/reference/dfm_trim.html
+feminizid_dfm_trimmed <- dfm_trim(feminizid_dfm, 
+                                  min_docfreq = 0.0003,  # Min. 0.03% (~11 Dokumente bei 35k)
+                                  max_docfreq = 0.90,    # Max. 90% der Dokumente
+                                  docfreq_type = "prop")  # Beide als Proportionen
+
+cat("=== TEXT-PREPROCESSING ===\n")
+cat("Dokumente:", ndoc(feminizid_dfm), "\n")
+cat("Original Features:", nfeat(feminizid_dfm), "\n")
+cat("Nach Trimming:", nfeat(feminizid_dfm_trimmed), "\n")
+cat("Sparsity:", round(sparsity(feminizid_dfm_trimmed), 3), "\n")
+
+# H\u00e4ufigste W\u00f6rter
+if (nfeat(feminizid_dfm_trimmed) > 0) {
+  top_features <- topfeatures(feminizid_dfm_trimmed, 25)
+  cat("\n=== H\u00c4UFIGSTE W\u00d6RTER ===\n")
+  print(top_features)
+} else {
+  cat("\nWARN: Keine Features nach Trimming - Parameter anpassen!\n")
 }
 ```
 
