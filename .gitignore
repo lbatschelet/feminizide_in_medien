@@ -95,9 +95,3 @@ rsconnect/
 local.env
 .env.local
 
-# Daten-Verzeichnis (heruntergeladene Datensätze)
-data/
-*.tsv
-*.tsv.xz
-*.csv
-*.csv.gz
