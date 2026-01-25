@@ -62,16 +62,19 @@ latest_checkpoint <- function(prefix, dir = "data") {
 save_checkpoint <- function(obj, prefix, dir = "data", compress = "xz") {
   file <- file.path(dir, paste0(prefix, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds"))
   saveRDS(obj, file, compress = compress)
-  message("Gespeichert: ", basename(file))
+  message("Saved checkpoint: ", basename(file))
   file
 }
 
 load_checkpoint <- function(prefix, var_name) {
   file <- latest_checkpoint(prefix)
-  if (is.null(file)) return(FALSE)
+  if (is.null(file)) {
+    message("No checkpoint found for: ", prefix)
+    return(NULL)
+  }
   assign(var_name, readRDS(file), envir = .GlobalEnv)
-  message("Geladen: ", basename(file))
-  TRUE
+  message("Loaded checkpoint: ", basename(file))
+  file
 }
 ```
 
@@ -158,7 +161,8 @@ variables used in analysis.
 ```{r data-preparation}
 # Load data (checkpoint first, TSV fallback)
 if (!exists("media_data")) {
-  if (!load_checkpoint("feminizid_raw_data", "media_data")) {
+  raw_file <- load_checkpoint("feminizid_raw_data", "media_data")
+  if (is.null(raw_file)) {
     tsv_files <- list.files("data", pattern = "\\.tsv(\\.xz)?$", full.names = TRUE)
     if (length(tsv_files) == 0) {
       message("WARN: Keine Datendateien gefunden - f\u00fchren Sie API-Call aus")
@@ -789,13 +793,12 @@ if (length(word2vec_models) >= 2) {
     cat("Analysierte W\u00f6rter:", length(frame_shift_results), "\n")
     cat("Gesamt Nachbar-Beziehungen:", nrow(all_frame_shifts), "\n")
     
-    # Beispiel: Top-Ver\u00e4nderungen f\u00fcr "hauslich_gewalt"
-    if ("hauslich_gewalt" %in% names(frame_shift_results)) {
-      cat("\n=== BEISPIEL: h\u00e4usliche_gewalt Frame-Shifts ===\n")
-      hauslich_shifts <- frame_shift_results[["hauslich_gewalt"]]
+    # Top 3 Nachbarn pro Zeitfenster fuer alle Zielwoerter
+    for (term in names(frame_shift_results)) {
+      cat("\n=== TARGET:", term, "===\n")
+      term_shifts <- frame_shift_results[[term]]
       
-      # Top 3 Nachbarn pro Zeitfenster
-      top_neighbors <- hauslich_shifts %>%
+      top_neighbors <- term_shifts %>%
         filter(rank <= 3) %>%
         select(period, neighbor, similarity) %>%
         arrange(period, -similarity)
@@ -845,6 +848,26 @@ if (exists("all_frame_shifts")) {
     
     print(p_heatmap)
   }
+
+  # Plot pro Target (Top-5 Nachbarn pro Zeitfenster)
+  for (term in unique(all_frame_shifts$target)) {
+    term_data <- all_frame_shifts %>%
+      filter(target == term, rank <= 5) %>%
+      select(period, neighbor, similarity)
+
+    if (nrow(term_data) == 0) next
+
+    p_term <- ggplot(term_data, aes(x = period, y = neighbor, fill = similarity)) +
+      geom_tile(color = "white") +
+      scale_fill_gradient(low = "white", high = "darkred", name = "Similarity") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1),
+            axis.text.y = element_text(size = 8)) +
+      labs(title = paste("Word2Vec frame shifts:", term),
+           x = "Time window", y = "Neighbors")
+
+    print(p_term)
+  }
   
   # Visualisierung 2: Stabilit\u00e4t vs. Wandel
   stability_analysis <- all_frame_shifts %>%
@@ -869,6 +892,119 @@ if (exists("all_frame_shifts")) {
     mutate(percentage = round(n / sum(n) * 100, 1))
   
   print(stability_summary)
+}
+```
+
+## Embedding projector export
+
+Export embeddings and metadata for the Embedding Projector visualization
+([Google Research blog](https://research.google/blog/open-sourcing-the-embedding-projector-a-tool-for-visualizing-high-dimensional-data/)).
+
+```{r word2vec-projector-export}
+if (exists("word2vec_models")) {
+  export_projector <- function(model, out_dir, terms, top_n = 10) {
+    if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+
+    in_vocab <- intersect(terms, rownames(as.matrix(model)))
+    if (length(in_vocab) == 0) {
+      message("No terms found in model vocabulary.")
+      return(invisible(NULL))
+    }
+
+    neighbor_list <- lapply(in_vocab, function(term) {
+      nn <- predict(model, term, type = "nearest", top_n = top_n)[[1]]$term2
+      unique(c(term, nn))
+    })
+    vocab <- unique(unlist(neighbor_list))
+
+    vectors <- as.matrix(model)[vocab, , drop = FALSE]
+    meta <- data.frame(
+      term = vocab,
+      type = ifelse(vocab %in% in_vocab, "target", "neighbor"),
+      stringsAsFactors = FALSE
+    )
+
+    write.table(vectors,
+                file = file.path(out_dir, "vectors.tsv"),
+                sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE)
+    write.table(meta,
+                file = file.path(out_dir, "metadata.tsv"),
+                sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
+
+    message("Saved projector files: ", out_dir)
+  }
+
+  # Pick a time window and export terms + nearest neighbors
+  projector_window <- names(word2vec_models)[1]
+  export_projector(
+    model = word2vec_models[[projector_window]],
+    out_dir = file.path("data", paste0("projector_", projector_window)),
+    terms = target_words,
+    top_n = 10
+  )
+}
+```
+
+## Local embedding visualization (R)
+
+Visualize embeddings directly in R using UMAP (2D) and ggplot.
+
+```{r word2vec-local-embedding}
+if (exists("word2vec_models")) {
+  if (!requireNamespace("umap", quietly = TRUE)) {
+    message("Package 'umap' not installed. Install with: install.packages('umap')")
+  } else {
+    set.seed(123)
+
+    # Pick a time window and build a local neighborhood for all target words
+    viz_window <- names(word2vec_models)[1]
+    model <- word2vec_models[[viz_window]]
+
+    in_vocab <- intersect(target_words, rownames(as.matrix(model)))
+    if (length(in_vocab) == 0) {
+      message("No target words found in model vocabulary.")
+    } else {
+      neighbor_list <- lapply(in_vocab, function(term) {
+        nn <- predict(model, term, type = "nearest", top_n = 10)[[1]]$term2
+        unique(c(term, nn))
+      })
+      vocab <- unique(unlist(neighbor_list))
+
+      vectors <- as.matrix(model)[vocab, , drop = FALSE]
+      umap_coords <- umap::umap(vectors)$layout
+
+      embedding_df <- data.frame(
+        term = vocab,
+        x = umap_coords[, 1],
+        y = umap_coords[, 2],
+        type = ifelse(vocab %in% in_vocab, "target", "neighbor"),
+        stringsAsFactors = FALSE
+      )
+
+      if (requireNamespace("plotly", quietly = TRUE)) {
+        p_umap <- plotly::plot_ly(
+          embedding_df,
+          x = ~x, y = ~y, color = ~type, text = ~term,
+          type = "scatter", mode = "markers",
+          marker = list(size = 7, opacity = 0.85)
+        ) %>%
+          plotly::layout(
+            title = paste("UMAP Word2Vec embeddings:", viz_window),
+            xaxis = list(title = "UMAP-1"),
+            yaxis = list(title = "UMAP-2")
+          )
+        p_umap
+      } else {
+        message("Package 'plotly' not installed. Install with: install.packages('plotly')")
+        p_umap <- ggplot(embedding_df, aes(x = x, y = y, color = type)) +
+          geom_point(alpha = 0.8, size = 2) +
+          theme_minimal() +
+          labs(title = paste("UMAP Word2Vec embeddings:", viz_window),
+               x = "UMAP-1", y = "UMAP-2", color = "Type")
+        print(p_umap)
+      }
+    }
+  }
 }
 ```
 
