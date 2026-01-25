@@ -1202,8 +1202,18 @@ relation_terms_extra <- setdiff(relation_terms_extra, SECOND_PASS_EXCLUDE)
 action_terms_second <- unique(c(action_terms, action_terms_extra))
 relation_terms_second <- unique(c(relation_terms, relation_terms_extra))
 
-action_terms_second <- unique(c(action_terms_second, add_wildcards_single(action_terms_second)))
-relation_terms_second <- unique(c(relation_terms_second, add_wildcards_single(relation_terms_second)))
+normalize_wildcards <- function(terms) {
+  terms <- unique(terms)
+  terms <- sub("\\*+$", "", terms)
+  terms <- unique(terms)
+  c(terms, paste0(terms[!grepl("\\s", terms)], "*"))
+}
+
+action_terms_second <- normalize_wildcards(action_terms_second)
+relation_terms_second <- normalize_wildcards(relation_terms_second)
+
+message("Second-pass action terms: ", paste(action_terms_second, collapse = ", "))
+message("Second-pass relation terms: ", paste(relation_terms_second, collapse = ", "))
 
 second_pass_result <- execute_swissdox_workflow(
   client = client,
@@ -1301,8 +1311,8 @@ wildcard_to_regex <- function(terms) {
   stringr::str_replace_all(escaped, "\\*", ".*")
 }
 
-action_regex <- wildcard_to_regex(action_terms_v2)
-relation_regex <- wildcard_to_regex(relation_terms_v2)
+action_regex <- wildcard_to_regex(action_terms_second)
+relation_regex <- wildcard_to_regex(relation_terms_second)
 
 media_data_second <- media_data_second %>%
   mutate(
