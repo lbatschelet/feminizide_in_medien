@@ -87,14 +87,50 @@ if (!is.null(collection_result$data)) {
 ## Datenübersicht und Aufbereitung
 
 ```{r data-preparation}
-# Daten laden (falls bereits vorhanden) oder aufbereiten
-raw_data_file <- paste0("data/feminizid_raw_data_", format(Sys.Date(), "%Y%m%d"), ".rds")
-
-if (!exists("media_data") && file.exists(raw_data_file)) {
-  message("Lade gespeicherte Rohdaten...")
-  media_data <- readRDS(raw_data_file)
-  message("✓ Rohdaten geladen: ", nrow(media_data), " Artikel")
+# Daten laden (suche nach vorhandenen Dateien)
+if (!exists("media_data")) {
+  # Prüfe zuerst nach .rds Dateien
+  rds_files <- list.files("data", pattern = "feminizid_raw_data_.*\\.rds$", full.names = TRUE)
+  if (length(rds_files) > 0) {
+    # Neueste .rds Datei verwenden
+    latest_rds <- rds_files[order(file.mtime(rds_files), decreasing = TRUE)][1]
+    message("Lade gespeicherte Rohdaten: ", basename(latest_rds))
+    media_data <- readRDS(latest_rds)
+    message("✓ Rohdaten geladen: ", nrow(media_data), " Artikel")
+  } else {
+    # Fallback: suche nach .tsv Dateien
+    tsv_files <- list.files("data", pattern = "\\.tsv(\\.xz)?$", full.names = TRUE)
+    if (length(tsv_files) > 0) {
+      message("Keine .rds Datei gefunden, lade .tsv Dateien...")
+      all_data <- list()
+      for (file in tsv_files) {
+        message("Lade: ", basename(file))
+        if (grepl("\\.xz$", file)) {
+          # Komprimierte Datei
+          data_chunk <- read_tsv(file, locale = locale(encoding = "UTF-8"))
+        } else {
+          # Normale TSV
+          data_chunk <- read_tsv(file, locale = locale(encoding = "UTF-8"))
+        }
+        all_data[[length(all_data) + 1]] <- data_chunk
+      }
+      # Alle Daten kombinieren
+      media_data <- bind_rows(all_data) %>%
+        distinct(id, .keep_all = TRUE)
+      message("✓ ", length(tsv_files), " Dateien kombiniert: ", nrow(media_data), " Artikel")
+      
+      # Als .rds speichern für nächstes Mal
+      current_rds <- paste0("data/feminizid_raw_data_", format(Sys.Date(), "%Y%m%d"), ".rds")
+      message("Speichere kombinierte Daten als: ", basename(current_rds))
+      saveRDS(media_data, current_rds, compress = "xz")
+    } else {
+      message("⚠️ Keine Datendateien gefunden - führen Sie API-Call aus")
+    }
+  }
 }
+```
+
+```{r data-cleaning}
 
 # Daten aufbereiten (falls noch nicht geschehen)
 if (exists("media_data")) {
@@ -501,7 +537,7 @@ if (exists("feminizid_dfm_trimmed")) {
      
      term_timeline <- term_data %>%
        pivot_longer(-year, names_to = "term", values_to = "frequency") %>%
-       filter(year >= 2000, year <= 2026)
+       filter(year >= 2000, year <= 2025)
     
     p7 <- ggplot(term_timeline, aes(x = year, y = frequency, color = term)) +
       geom_line(size = 1, alpha = 0.8) +
