@@ -925,60 +925,10 @@ if (exists("all_frame_shifts")) {
 }
 ```
 
-## Embedding projector export
-
-Export embeddings and metadata for the Embedding Projector visualization
-([Google Research blog](https://research.google/blog/open-sourcing-the-embedding-projector-a-tool-for-visualizing-high-dimensional-data/)).
-
-```{r word2vec-projector-export}
-if (exists("word2vec_models")) {
-  export_projector <- function(model, out_dir, terms, top_n = 10) {
-    if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
-
-    target_terms_model <- unique(target_map$normalized)
-    in_vocab <- intersect(target_terms_model, rownames(as.matrix(model)))
-    if (length(in_vocab) == 0) {
-      message("No terms found in model vocabulary.")
-      return(invisible(NULL))
-    }
-
-    neighbor_list <- lapply(in_vocab, function(term) {
-      nn <- predict(model, term, type = "nearest", top_n = top_n)[[1]]$term2
-      unique(c(term, nn))
-    })
-    vocab <- unique(unlist(neighbor_list))
-
-    vectors <- as.matrix(model)[vocab, , drop = FALSE]
-    meta <- data.frame(
-      term = vocab,
-      type = ifelse(vocab %in% in_vocab, "target", "neighbor"),
-      stringsAsFactors = FALSE
-    )
-
-    write.table(vectors,
-                file = file.path(out_dir, "vectors.tsv"),
-                sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE)
-    write.table(meta,
-                file = file.path(out_dir, "metadata.tsv"),
-                sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
-
-    message("Saved projector files: ", out_dir)
-  }
-
-  # Pick a time window and export terms + nearest neighbors
-  projector_window <- names(word2vec_models)[1]
-  export_projector(
-    model = word2vec_models[[projector_window]],
-    out_dir = file.path("data", paste0("projector_", projector_window)),
-    terms = target_words,
-    top_n = 10
-  )
-}
-```
-
 ## Local embedding visualization (R)
 
-Visualize embeddings directly in R using UMAP (2D) and ggplot.
+Visualize embeddings in R with UMAP. UMAP reduces the high-dimensional
+Word2Vec space to two dimensions for exploration.
 
 ```{r word2vec-local-embedding}
 if (exists("word2vec_models")) {
@@ -987,8 +937,9 @@ if (exists("word2vec_models")) {
   } else {
     set.seed(123)
 
-    # Pick a time window and build a local neighborhood for all target words
-    viz_window <- names(word2vec_models)[1]
+    # Use the latest time window (based on end year in the label)
+    window_end_year <- function(x) as.integer(sub(".*-(\\d{4})$", "\\1", x))
+    viz_window <- names(word2vec_models)[which.max(window_end_year(names(word2vec_models)))]
     model <- word2vec_models[[viz_window]]
 
     target_terms_model <- unique(target_map$normalized)
@@ -1021,18 +972,19 @@ if (exists("word2vec_models")) {
           marker = list(size = 7, opacity = 0.85)
         ) %>%
           plotly::layout(
-            title = paste("UMAP Word2Vec embeddings:", viz_window),
-            xaxis = list(title = "UMAP-1"),
-            yaxis = list(title = "UMAP-2")
+            title = paste("Word2Vec embeddings (UMAP):", viz_window),
+            xaxis = list(title = "UMAP dimension 1"),
+            yaxis = list(title = "UMAP dimension 2")
           )
         p_umap
       } else {
         message("Package 'plotly' not installed. Install with: install.packages('plotly')")
-        p_umap <- ggplot(embedding_df, aes(x = x, y = y, color = type)) +
+      p_umap <- ggplot(embedding_df, aes(x = x, y = y, color = type)) +
           geom_point(alpha = 0.8, size = 2) +
           theme_minimal() +
-          labs(title = paste("UMAP Word2Vec embeddings:", viz_window),
-               x = "UMAP-1", y = "UMAP-2", color = "Type")
+          labs(title = paste("Word2Vec embeddings (UMAP):", viz_window),
+               subtitle = "UMAP axes are abstract; distances reflect local similarity",
+               x = "UMAP dimension 1", y = "UMAP dimension 2", color = "Type")
         print(p_umap)
       }
     }
