@@ -83,6 +83,8 @@ load_checkpoint <- function(prefix, var_name) {
 SAVE_CORPUS <- FALSE
 USE_STEMMING <- TRUE
 UMLAUT_MODE <- "none"  # "none" | "ae" | "strip"
+TRAIN_FULL_MODEL <- TRUE
+FULL_MODEL_LABEL <- "all_2000-2025"
 
 # Multi-word patterns after stemming (used in preprocessing + word2vec)
 simplified_patterns <- list(
@@ -657,7 +659,7 @@ load_checkpoint("word2vec_frame_shifts", "all_frame_shifts")
 stopifnot(exists("feminizid_corpus"))
 library(word2vec)
   
-  # Zeitfenster definieren (5-Jahres-Fenster f\u00fcr ausreichend Daten)
+  # Time windows (5-year bins)
   time_windows <- list(
     "2000-2004" = c(2000, 2004),
     "2005-2009" = c(2005, 2009), 
@@ -690,89 +692,88 @@ library(word2vec)
   cat("Time windows:", length(time_windows), "\n")
   cat("Target words:", length(target_words), "\n")
   cat("Strategy: one model per window\n")
+  if (TRAIN_FULL_MODEL) {
+    cat("Full-period model:", FULL_MODEL_LABEL, "\n")
+  }
 ```
 
 ```{r word2vec-training}
 stopifnot(exists("feminizid_corpus"))
   
-  # F\u00fcr jedes Zeitfenster separates Word2Vec-Modell trainieren
+  # Train models for each window + optional full-period model
   word2vec_models <- list()
   word2vec_embeddings <- list()
-  
-  for (window_name in names(time_windows)) {
-    window_years <- time_windows[[window_name]]
-    
-    # Korpus f\u00fcr Zeitfenster filtern
-    window_corpus <- corpus_subset(feminizid_corpus, 
-                                  year >= window_years[1] & year <= window_years[2])
-    
-    # Mindestanzahl Dokumente pr\u00fcfen
-    n_docs <- ndoc(window_corpus)
-    if (n_docs < 100) {
-      cat("WARN: Zeitfenster", window_name, "hat nur", n_docs, "Dokumente - \u00fcbersprungen\n")
-      next
-    }
-    
-    # Text f\u00fcr Word2Vec vorbereiten (bereits gestemmte Tokens verwenden)
-    window_tokens <- tokens(window_corpus,
-                           remove_punct = TRUE,
-                           remove_symbols = TRUE,
-                           remove_numbers = TRUE,
-                           remove_url = TRUE) %>%
+
+  build_w2v_text <- function(corpus_obj) {
+    tokens_obj <- tokens(corpus_obj,
+                         remove_punct = TRUE,
+                         remove_symbols = TRUE,
+                         remove_numbers = TRUE,
+                         remove_url = TRUE) %>%
       tokens_tolower() %>%
       tokens_remove(all_stopwords, min_nchar = 3)
-
     if (USE_STEMMING) {
-      window_tokens <- tokens_wordstem(window_tokens, language = "de")
+      tokens_obj <- tokens_wordstem(tokens_obj, language = "de")
     }
-    
-    # Multi-Word-Expressions anwenden
     for (pattern in simplified_patterns) {
-      window_tokens <- tokens_compound(window_tokens, 
-                                      pattern = phrase(paste(pattern, collapse = " ")),
-                                      concatenator = "_")
+      tokens_obj <- tokens_compound(tokens_obj,
+                                    pattern = phrase(paste(pattern, collapse = " ")),
+                                    concatenator = "_")
     }
-    
-    # Zu Text f\u00fcr Word2Vec konvertieren
-    window_text <- sapply(window_tokens, paste, collapse = " ")
-    window_text <- window_text[nchar(window_text) > 50]  # Nur l\u00e4ngere Texte
-    
-    if (length(window_text) < 50) {
-      cat("WARN: Zeitfenster", window_name, "hat zu wenig Text - \u00fcbersprungen\n")
-      next
+    txt <- sapply(tokens_obj, paste, collapse = " ")
+    txt[nchar(txt) > 50]
+  }
+
+  train_w2v <- function(label, corpus_obj) {
+    n_docs <- ndoc(corpus_obj)
+    txt <- build_w2v_text(corpus_obj)
+    if (n_docs < 100 || length(txt) < 50) {
+      cat("WARN: Skip", label, "- too little data\n")
+      return(NULL)
     }
-    
-    # Word2Vec-Modell trainieren
-    cat("Training Word2Vec f\u00fcr", window_name, "(", n_docs, "Dokumente,", length(window_text), "Texte)...\n")
-    
-    w2v_model <- word2vec(x = window_text, 
-                         type = "skip-gram",  # Skip-gram besser f\u00fcr seltene W\u00f6rter
-                         dim = 100,           # 100 Dimensionen
-                         iter = 20,           # 20 Iterationen
-                         min_count = 5,       # Min. 5 Vorkommen
-                         window = 5)          # Kontext-Fenster 5 W\u00f6rter
-    
-    word2vec_models[[window_name]] <- w2v_model
-    
-    # Embeddings for target words (normalized)
+    cat("Training Word2Vec for", label, "(", n_docs, "docs,", length(txt), "texts)...\n")
+    word2vec(x = txt,
+             type = "skip-gram",
+             dim = 100,
+             iter = 20,
+             min_count = 5,
+             window = 5)
+  }
+
+  for (window_name in names(time_windows)) {
+    window_years <- time_windows[[window_name]]
+    window_corpus <- corpus_subset(
+      feminizid_corpus,
+      year >= window_years[1] & year <= window_years[2]
+    )
+    model <- train_w2v(window_name, window_corpus)
+    if (is.null(model)) next
+    word2vec_models[[window_name]] <- model
+
     target_terms_model <- unique(target_map$normalized)
-    available_words <- intersect(target_terms_model, rownames(as.matrix(w2v_model)))
+    available_words <- intersect(target_terms_model, rownames(as.matrix(model)))
     if (length(available_words) > 0) {
-      embeddings <- predict(w2v_model, available_words, type = "embedding")
-      word2vec_embeddings[[window_name]] <- embeddings
-      cat("Embeddings extracted for", length(available_words), "targets\n")
+      word2vec_embeddings[[window_name]] <- predict(model, available_words, type = "embedding")
     } else {
       cat("WARN: No target words found in", window_name, "\n")
     }
   }
+
+  if (TRAIN_FULL_MODEL) {
+    full_model <- train_w2v(FULL_MODEL_LABEL, feminizid_corpus)
+    if (!is.null(full_model)) {
+      word2vec_models[[FULL_MODEL_LABEL]] <- full_model
+    }
+  }
   
-  cat("\n=== TRAINING ABGESCHLOSSEN ===\n")
-  cat("Erfolgreiche Modelle:", length(word2vec_models), "\n")
+  cat("\n=== TRAINING DONE ===\n")
+  cat("Models:", length(word2vec_models), "\n")
   save_checkpoint(word2vec_models, "word2vec_models")
 ```
 
 ```{r word2vec-frame-shift}
-if (length(word2vec_models) >= 2) {
+window_models <- intersect(names(word2vec_models), names(time_windows))
+if (length(window_models) >= 2) {
   
   # Frame-Shift-Analyse: Was ist in der N\u00e4he von was?
   frame_shift_results <- list()
@@ -784,7 +785,7 @@ if (length(word2vec_models) >= 2) {
     # F\u00fcr jedes Zeitfenster die n\u00e4chsten Nachbarn finden
     neighbors_over_time <- list()
     
-    for (window_name in names(word2vec_models)) {
+    for (window_name in window_models) {
       model <- word2vec_models[[window_name]]
       
       # Pr\u00fcfen ob Wort im Modell vorhanden
@@ -937,9 +938,18 @@ if (exists("word2vec_models")) {
   } else {
     set.seed(123)
 
-    # Use the latest time window (based on end year in the label)
-    window_end_year <- function(x) as.integer(sub(".*-(\\d{4})$", "\\1", x))
-    viz_window <- names(word2vec_models)[which.max(window_end_year(names(word2vec_models)))]
+    # Prefer full-period model if available, otherwise latest window
+    if (FULL_MODEL_LABEL %in% names(word2vec_models)) {
+      viz_window <- FULL_MODEL_LABEL
+    } else {
+      available_windows <- intersect(names(word2vec_models), names(time_windows))
+      if (length(available_windows) > 0) {
+        viz_window <- tail(available_windows, 1)
+      } else {
+        viz_window <- tail(names(word2vec_models), 1)
+      }
+    }
+    message("Using window: ", viz_window)
     model <- word2vec_models[[viz_window]]
 
     target_terms_model <- unique(target_map$normalized)
