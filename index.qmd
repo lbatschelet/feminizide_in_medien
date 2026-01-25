@@ -1,8 +1,17 @@
 ---
-title: "Feminicide in Media - Data Collection"
-output: html_notebook
-encoding: UTF-8
+title: "Feminicide in Media Coverage"
+subtitle: "Swiss Media Reporting Since 1990"
+author:
+  - name: Lukas Batschelet
+    affiliations:
+      - name: University of Bern
+  - name: Linus Kiener
+    affiliations:
+      - name: University of Bern
+date: today
+lang: en
 ---
+
 
 # Setup
 

@@ -216,12 +216,12 @@ SwissdoxAPI <- R6::R6Class("SwissdoxAPI",
     #' 
     #' @param query_id Query ID to monitor
     #' @param check_interval Seconds between status checks (default: 30)
-    #' @param max_wait_time Maximum wait time in seconds (default: 3600)
+    #' @param max_wait_time Maximum wait time in seconds (default: Inf)
     #' @param verbose Whether to print status updates (default: TRUE)
     #' 
     #' @return Final query status when completed
     #' @export
-    wait_for_completion = function(query_id, check_interval = 30, max_wait_time = 3600, verbose = TRUE) {
+    wait_for_completion = function(query_id, check_interval = 30, max_wait_time = Inf, verbose = TRUE) {
       if (missing(query_id)) {
         stop("query_id is required")
       }
@@ -248,7 +248,7 @@ SwissdoxAPI <- R6::R6Class("SwissdoxAPI",
         }
         
         elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
-        if (elapsed > max_wait_time) {
+        if (is.finite(max_wait_time) && elapsed > max_wait_time) {
           stop("Timeout reached. Query still running after ", max_wait_time, " seconds")
         }
         
@@ -585,7 +585,7 @@ create_swissdox_query <- function(content_terms = NULL,
 #' @param output_dir Directory to save downloaded file (default: "data")
 #' @param wait_for_completion Whether to wait for query completion (default: TRUE)
 #' @param check_interval Seconds between status checks (default: 30)
-#' @param max_wait_time Maximum wait time in seconds (default: 3600)
+#' @param max_wait_time Maximum wait time in seconds (default: Inf)
 #' 
 #' @return List with query information and file path (if completed)
 #' 
@@ -615,7 +615,7 @@ execute_swissdox_workflow <- function(client,
                                      output_dir = "data",
                                      wait_for_completion = TRUE,
                                      check_interval = 30,
-                                     max_wait_time = 3600) {
+                                     max_wait_time = Inf) {
   
   if (!inherits(client, "SwissdoxAPI")) {
     stop("client must be a SwissdoxAPI instance")

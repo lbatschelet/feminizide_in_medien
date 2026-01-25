@@ -102,3 +102,4 @@ data/
 *.csv
 *.csv.gz
 *.RData
+/.quarto/

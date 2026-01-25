@@ -1,0 +1,64 @@
+---
+title: "Feminicide in Media Coverage"
+subtitle: "Swiss Media Reporting Since 1990"
+author:
+  - name: Lukas Batschelet
+    affiliations:
+      - name: University of Bern
+  - name: Linus Kiener
+    affiliations:
+      - name: University of Bern
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+  pdf:
+    toc: true
+    number-sections: true
+lang: en
+---
+
+## Abstract
+
+We study how Swiss media report on feminicide and related forms of gendered
+violence. Using the Swissdox@LiRI API, we compile a large corpus of German-
+language media articles (1990–present) and apply quantitative text analysis
+to identify shifts in terminology and framing over time.
+
+## Project Context
+
+This project is part of the seminar **Computational Social Science** and is
+supervised by **Rudy Farys** and **Achim Edelmann**.
+
+## Research Questions
+
+- How does the vocabulary used to describe feminicide change over time?
+- Which terms become more or less prominent in later periods?
+- How do action and relation terms co-occur in reporting?
+
+## Data
+
+We access Swiss media articles via the Swissdox@LiRI API. The dataset includes
+article metadata and full-text content in German. The second-pass query is
+restricted to 1990–present to ensure manageable volume and consistency.
+
+## Methods
+
+We use a two-stage query strategy and text preprocessing based on quanteda.
+For diachronic analysis, we combine normalized term usage over time with
+key-term contrasts between early and late periods.
+
+## Results
+
+Results are reported in the accompanying analysis notebook.
+
+## Limitations and Ethics
+
+We discuss limitations of media coverage as a proxy for real-world incidence
+and reflect on ethical considerations in handling sensitive content.
+
+## Appendix
+
+All code and intermediate checkpoints are stored in the project repository.
