@@ -72,6 +72,7 @@ load_checkpoint <- function(prefix, var_name) {
   assign(var_name, readRDS(file), envir = .GlobalEnv)
   message("Geladen: ", basename(file))
   TRUE
+}
 ```
 
 ```{r text-config}
