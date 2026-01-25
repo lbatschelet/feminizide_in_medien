@@ -355,7 +355,9 @@ SwissdoxAPI <- R6::R6Class("SwissdoxAPI",
 #' Helper function to create properly formatted YAML queries for the Swissdox API.
 #' Supports various search parameters and content filtering options.
 #' 
-#' @param content_terms Character vector of search terms (required)
+#' @param content_terms Character vector of search terms (optional if content_groups is used)
+#' @param content_groups List of content groups for AND-combined subqueries.
+#'   Each element is a list with fields: operator ("OR" or "AND") and terms (character vector).
 #' @param sources Character vector of media source codes (optional)
 #' @param date_from Start date in YYYY-MM-DD format (default: "2000-01-01")
 #' @param date_to End date in YYYY-MM-DD format (default: current date)
@@ -388,7 +390,8 @@ SwissdoxAPI <- R6::R6Class("SwissdoxAPI",
 #' }
 #' 
 #' @export
-create_swissdox_query <- function(content_terms,
+create_swissdox_query <- function(content_terms = NULL,
+                                 content_groups = NULL,
                                  sources = NULL,
                                  date_from = "2000-01-01",
                                  date_to = format(Sys.Date(), "%Y-%m-%d"),
@@ -398,9 +401,9 @@ create_swissdox_query <- function(content_terms,
                                  result_format = "TSV",
                                  columns = c("id", "pubtime", "medium_name", "head", "content"),
                                  content_operator = "OR") {
-  
-  if (missing(content_terms) || length(content_terms) == 0) {
-    stop("content_terms is required and cannot be empty")
+  if ((is.null(content_terms) || length(content_terms) == 0) &&
+      (is.null(content_groups) || length(content_groups) == 0)) {
+    stop("Provide content_terms or content_groups")
   }
   
   # Validate parameters
@@ -441,7 +444,20 @@ create_swissdox_query <- function(content_terms,
   }
   
   # Build content query - match exact structure from API example
-  if (content_operator == "OR") {
+  if (!is.null(content_groups) && length(content_groups) > 0) {
+    groups <- lapply(content_groups, function(group) {
+      op <- if (!is.null(group$operator)) group$operator else "OR"
+      terms <- if (!is.null(group$terms)) group$terms else character(0)
+      if (!op %in% c("OR", "AND")) {
+        stop("content_groups operator must be 'OR' or 'AND'")
+      }
+      if (length(terms) == 0) {
+        stop("content_groups terms cannot be empty")
+      }
+      setNames(list(terms), op)
+    })
+    content_query <- list(AND = groups)
+  } else if (content_operator == "OR") {
     content_query <- list(OR = content_terms)  # Direct vector, not list of lists
   } else {
     content_query <- list(AND = content_terms)
@@ -490,21 +506,39 @@ create_swissdox_query <- function(content_terms,
   )
   
   # Add content structure exactly like API example
-  if (is.null(exclude_terms) || length(exclude_terms) == 0) {
-    # Simple OR structure
-    yaml_lines <- c(yaml_lines, "        OR:")
-    for (term in content_terms) {
-      yaml_lines <- c(yaml_lines, paste0("            - ", term))
-    }
-  } else {
-    # AND structure with OR and NOT elements like API example
+  if (!is.null(content_groups) && length(content_groups) > 0) {
     yaml_lines <- c(yaml_lines, "        AND:")
-    yaml_lines <- c(yaml_lines, "            - OR:")
+    for (group in content_groups) {
+      op <- if (!is.null(group$operator)) group$operator else "OR"
+      terms <- if (!is.null(group$terms)) group$terms else character(0)
+      yaml_lines <- c(yaml_lines, paste0("            - ", op, ":"))
+      for (term in terms) {
+        yaml_lines <- c(yaml_lines, paste0("                - ", term))
+      }
+    }
+    if (!is.null(exclude_terms) && length(exclude_terms) > 0) {
+      for (exclude in exclude_terms) {
+        yaml_lines <- c(yaml_lines, paste0("            - NOT: ", exclude))
+      }
+    }
+  } else if (!is.null(exclude_terms) && length(exclude_terms) > 0) {
+    yaml_lines <- c(yaml_lines, "        AND:")
+    yaml_lines <- c(yaml_lines, paste0("            - ", content_operator, ":"))
     for (term in content_terms) {
       yaml_lines <- c(yaml_lines, paste0("                - ", term))
     }
     for (exclude in exclude_terms) {
       yaml_lines <- c(yaml_lines, paste0("            - NOT: ", exclude))
+    }
+  } else if (content_operator == "OR") {
+    yaml_lines <- c(yaml_lines, "        OR:")
+    for (term in content_terms) {
+      yaml_lines <- c(yaml_lines, paste0("            - ", term))
+    }
+  } else {
+    yaml_lines <- c(yaml_lines, "        AND:")
+    for (term in content_terms) {
+      yaml_lines <- c(yaml_lines, paste0("            - ", term))
     }
   }
   
