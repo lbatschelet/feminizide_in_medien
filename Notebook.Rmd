@@ -34,9 +34,9 @@ source("swissdox_api.R")
 # Environment-Variablen aus local.env laden
 if (file.exists("local.env")) {
   load_dot_env("local.env")
-  message("✓ Environment-Variablen aus local.env geladen")
+  message("\u2713 Environment-Variablen aus local.env geladen")
 } else {
-  message("⚠️ local.env nicht gefunden - verwende System-Environment")
+  message("WARN: local.env nicht gefunden - verwende System-Environment")
 }
 
 # API Client mit Credentials initialisieren
@@ -46,20 +46,56 @@ client <- SwissdoxAPI$new(
 )
 ```
 
-## Query für Feminizid-Berichterstattung
+```{r checkpoint-utils}
+# Checkpoint helpers (load/save latest timestamped files)
+find_latest <- function(pattern, dir = "data") {
+  files <- list.files(dir, pattern = pattern, full.names = TRUE)
+  if (length(files) == 0) return(NULL)
+  files[order(file.mtime(files), decreasing = TRUE)][1]
+}
+
+latest_checkpoint <- function(prefix, dir = "data") {
+  pattern <- paste0("^", prefix, "_\\d{8}_\\d{6}\\.rds$")
+  find_latest(pattern, dir)
+}
+
+save_checkpoint <- function(obj, prefix, dir = "data", compress = "xz") {
+  file <- file.path(dir, paste0(prefix, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds"))
+  saveRDS(obj, file, compress = compress)
+  message("Gespeichert: ", basename(file))
+  file
+}
+
+load_checkpoint <- function(prefix, var_name) {
+  file <- latest_checkpoint(prefix)
+  if (is.null(file)) return(FALSE)
+  assign(var_name, readRDS(file), envir = .GlobalEnv)
+  message("Geladen: ", basename(file))
+  TRUE
+```
+
+## Data collection
+
+Build and run the Swissdox query. Use the checkpoint load block to resume
+without re-running the API call.
+
+```{r checkpoint-load-raw}
+# Checkpoint load (raw data)
+load_checkpoint("feminizid_raw_data", "media_data")
+```
 
 ```{r feminizid-data-collection}
-# Feminizid-Keywords definieren (zentrale Definition)
+# Keyword list (central definition)
 feminizid_keywords <- c(
   "Feminizid", "Femizid", "Frauenmord", "Femicide",
-  "Familiendrama", "Familientragödie", "Beziehungstat", "Ehestreit",
-  "häusliche Gewalt", "Partnerschaftsgewalt", "Gewalt gegen Frauen",
-  "Tötung von Frau", "Mord an Frau", "Partnergewalt", "Beziehungsgewalt"
+  "Familiendrama", "Familientrag\u00f6die", "Beziehungstat", "Ehestreit",
+  "h\u00e4usliche Gewalt", "Partnerschaftsgewalt", "Gewalt gegen Frauen",
+  "T\u00f6tung von Frau", "Mord an Frau", "Partnergewalt", "Beziehungsgewalt"
 )
 ```
 
 ```{r execute-collection}
-# Vollständige Datenerhebung mit API-Wrapper
+# Vollst\u00e4ndige Datenerhebung mit API-Wrapper
 collection_result <- execute_swissdox_workflow(
   client = client,
   query = create_swissdox_query(
@@ -79,62 +115,36 @@ collection_result <- execute_swissdox_workflow(
   output_dir = "data"
 )
 
-# Daten verfügbar machen und speichern
+# Store results and save checkpoint
 if (!is.null(collection_result$data)) {
   media_data <- collection_result$data
-  
-  # Rohdaten speichern
-  raw_data_file <- paste0("data/feminizid_raw_data_", format(Sys.Date(), "%Y%m%d"), ".rds")
-  saveRDS(media_data, raw_data_file)
-  
-  message("✓ ", collection_result$message)
-  message("✓ Rohdaten gespeichert: ", raw_data_file)
+  save_checkpoint(media_data, "feminizid_raw_data")
+  message("\u2713 ", collection_result$message)
 } else {
   message("Fehler beim Laden der Daten")
 }
 ```
 
-## Datenübersicht und Aufbereitung
+## Data preparation
+
+Load raw data (from checkpoint or TSV), clean fields, and prepare time
+variables used in analysis.
 
 ```{r data-preparation}
-# Daten laden (suche nach vorhandenen Dateien)
+# Load data (checkpoint first, TSV fallback)
 if (!exists("media_data")) {
-  # Prüfe zuerst nach .rds Dateien
-  rds_files <- list.files("data", pattern = "feminizid_raw_data_.*\\.rds$", full.names = TRUE)
-  if (length(rds_files) > 0) {
-    # Neueste .rds Datei verwenden
-    latest_rds <- rds_files[order(file.mtime(rds_files), decreasing = TRUE)][1]
-    message("Lade gespeicherte Rohdaten: ", basename(latest_rds))
-    media_data <- readRDS(latest_rds)
-    message("✓ Rohdaten geladen: ", nrow(media_data), " Artikel")
-  } else {
-    # Fallback: suche nach .tsv Dateien
+  if (!load_checkpoint("feminizid_raw_data", "media_data")) {
     tsv_files <- list.files("data", pattern = "\\.tsv(\\.xz)?$", full.names = TRUE)
-    if (length(tsv_files) > 0) {
-      message("Keine .rds Datei gefunden, lade .tsv Dateien...")
-      all_data <- list()
-      for (file in tsv_files) {
-        message("Lade: ", basename(file))
-        if (grepl("\\.xz$", file)) {
-          # Komprimierte Datei
-          data_chunk <- read_tsv(file, locale = locale(encoding = "UTF-8"))
-        } else {
-          # Normale TSV
-          data_chunk <- read_tsv(file, locale = locale(encoding = "UTF-8"))
-        }
-        all_data[[length(all_data) + 1]] <- data_chunk
-      }
-      # Alle Daten kombinieren
-      media_data <- bind_rows(all_data) %>%
-        distinct(id, .keep_all = TRUE)
-      message("✓ ", length(tsv_files), " Dateien kombiniert: ", nrow(media_data), " Artikel")
-      
-      # Als .rds speichern für nächstes Mal
-      current_rds <- paste0("data/feminizid_raw_data_", format(Sys.Date(), "%Y%m%d"), ".rds")
-      message("Speichere kombinierte Daten als: ", basename(current_rds))
-      saveRDS(media_data, current_rds, compress = "xz")
+    if (length(tsv_files) == 0) {
+      message("WARN: Keine Datendateien gefunden - f\u00fchren Sie API-Call aus")
     } else {
-      message("⚠️ Keine Datendateien gefunden - führen Sie API-Call aus")
+      message("Keine .rds Datei gefunden, lade .tsv Dateien...")
+      media_data <- bind_rows(lapply(tsv_files, function(file) {
+        message("Lade: ", basename(file))
+        read_tsv(file, locale = locale(encoding = "UTF-8"))
+      })) %>% distinct(id, .keep_all = TRUE)
+      message("\u2713 ", length(tsv_files), " Dateien kombiniert: ", nrow(media_data), " Artikel")
+      save_checkpoint(media_data, "feminizid_raw_data")
     }
   }
 }
@@ -144,14 +154,14 @@ if (!exists("media_data")) {
 
 # Daten aufbereiten (falls noch nicht geschehen)
 if (exists("media_data")) {
-  # Datum konvertieren und zusätzliche Zeitvariablen erstellen
+  # Datum konvertieren und zus\u00e4tzliche Zeitvariablen erstellen
   media_data$pubtime <- as.POSIXct(media_data$pubtime)
   media_data$pub_date <- as.Date(media_data$pubtime)
   media_data$year <- format(media_data$pub_date, "%Y")
   media_data$month <- format(media_data$pub_date, "%m")
   media_data$month_year <- format(media_data$pub_date, "%Y-%m")
   
-  # Nur deutsche Artikel (französische rausfiltern)
+  # Nur deutsche Artikel (franz\u00f6sische rausfiltern)
   media_data <- media_data %>%
     filter(language == "de") %>%
     filter(!is.na(content), content != "", nchar(content) > 50)
@@ -160,7 +170,7 @@ if (exists("media_data")) {
   message("Zeitraum: ", min(media_data$pub_date, na.rm = TRUE), " bis ", max(media_data$pub_date, na.rm = TRUE))
   message("Medien: ", length(unique(media_data$medium_name)))
 } else {
-  message("Keine Daten verfügbar - führen Sie zuerst die Datenerhebung aus")
+  message("Keine Daten verf\u00fcgbar - f\u00fchren Sie zuerst die Datenerhebung aus")
 }
 ```
 
@@ -175,7 +185,7 @@ if (exists("media_data")) {
   p1 <- ggplot(yearly_counts, aes(x = as.numeric(year), y = n)) +
     geom_col(fill = "steelblue", alpha = 0.7) +
     theme_minimal() +
-    labs(title = "Feminizid-Berichterstattung über Zeit", 
+    labs(title = "Feminizid-Berichterstattung \u00fcber Zeit", 
          subtitle = "Deutsche Medien 2000-2026",
          x = "Jahr", y = "Anzahl Artikel") +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -209,7 +219,7 @@ if (exists("media_data")) {
   print(p3)
   
   # Zusammenfassung
-  cat("\n=== DATENÜBERSICHT ===\n")
+  cat("\n=== DATEN\u00dcBERSICHT ===\n")
   cat("Deutsche Artikel:", nrow(media_data), "\n")
   cat("Zeitraum:", min(media_data$pub_date, na.rm = TRUE), "bis", max(media_data$pub_date, na.rm = TRUE), "\n")
   cat("Medien:", length(unique(media_data$medium_name)), "\n")
@@ -220,7 +230,7 @@ if (exists("media_data")) {
 ```{r keyword-analysis}
 if (exists("media_data")) {
   
-  # Keyword-Häufigkeit in Headlines (verwende zentrale Definition)
+  # Keyword-H\u00e4ufigkeit in Headlines (verwende zentrale Definition)
   keyword_counts <- data.frame(keyword = character(), count = numeric())
   
   for (kw in feminizid_keywords) {
@@ -236,13 +246,13 @@ if (exists("media_data")) {
     geom_col(fill = "darkred", alpha = 0.7) +
     coord_flip() +
     theme_minimal() +
-    labs(title = "Keyword-Häufigkeit in Schlagzeilen", 
+    labs(title = "Keyword-H\u00e4ufigkeit in Schlagzeilen", 
          x = "Keyword", y = "Anzahl Artikel")
   
   print(p4)
   
   # Top Keywords ausgeben
-  cat("\n=== KEYWORD-HÄUFIGKEIT ===\n")
+  cat("\n=== KEYWORD-H\u00c4UFIGKEIT ===\n")
   print(keyword_counts)
 }
 ```
@@ -250,7 +260,7 @@ if (exists("media_data")) {
 ```{r time-trends}
 if (exists("media_data")) {
   
-  # Zeittrends für Keywords (verwende zentrale Definition)
+  # Zeittrends f\u00fcr Keywords (verwende zentrale Definition)
   keyword_timeline <- data.frame()
   
   for (kw in feminizid_keywords) {
@@ -276,7 +286,7 @@ if (exists("media_data")) {
     filter(sum(keyword_articles) > 10) %>%  # Mindestens 10 Artikel insgesamt
     ungroup()
   
-  # Absolute Zahlen über Zeit
+  # Absolute Zahlen \u00fcber Zeit
   p5 <- ggplot(keyword_timeline, aes(x = as.numeric(year), y = keyword_articles, color = keyword)) +
     geom_line(size = 1, alpha = 0.8) +
     geom_point(size = 1.5, alpha = 0.7) +
@@ -297,7 +307,7 @@ if (exists("media_data")) {
     geom_tile(color = "white", size = 0.1) +
     scale_fill_gradient(low = "white", high = "darkred", name = "Artikel") +
     theme_minimal() +
-    labs(title = "Keyword-Intensität über Zeit", x = "Jahr", y = "Keyword") +
+    labs(title = "Keyword-Intensit\u00e4t \u00fcber Zeit", x = "Jahr", y = "Keyword") +
     theme(axis.text.x = element_text(angle = 45, hjust = 1),
           axis.text.y = element_text(size = 9))
   
@@ -320,148 +330,77 @@ if (exists("media_data")) {
 }
 ```
 
-## Textkorpus und Preprocessing
+## Corpus and preprocessing
 
-```{r corpus-setup}
-if (exists("media_data")) {
-  
-  # Daten für Korpus vorbereiten
-  corpus_data <- media_data %>%
-    distinct(id, .keep_all = TRUE) %>%  # Duplikate entfernen
-    filter(!is.na(content), content != "", nchar(content) > 100) %>%  # Mindestlänge
-    mutate(unique_id = paste0("doc_", row_number()))  # Eindeutige IDs
-  
-  message("Artikel für Korpus: ", nrow(corpus_data))
-  
-} else {
-  message("Keine Daten für Korpus verfügbar")
-}
+Build a quanteda corpus and a trimmed DFM from the cleaned articles. Use the
+checkpoint load block to resume without reprocessing.
+
+```{r checkpoint-load-corpus}
+# Checkpoint load (corpus/dfm)
+load_checkpoint("feminizid_corpus", "feminizid_corpus")
+load_checkpoint("feminizid_dfm", "feminizid_dfm_trimmed")
 ```
 
-```{r create-corpus}
-# Korpus laden (falls bereits vorhanden)
-corpus_file <- paste0("data/feminizid_corpus_", format(Sys.Date(), "%Y%m%d"), ".rds")
-dfm_file <- paste0("data/feminizid_dfm_", format(Sys.Date(), "%Y%m%d"), ".rds")
+```{r corpus-setup}
+stopifnot(exists("media_data"))
 
-if (!exists("feminizid_corpus") && file.exists(corpus_file)) {
-  message("Lade gespeicherten Korpus...")
-  feminizid_corpus <- readRDS(corpus_file)
-  message("✓ Korpus geladen: ", ndoc(feminizid_corpus), " Dokumente")
-}
+if (!exists("feminizid_corpus")) {
+  corpus_data <- media_data %>%
+    distinct(id, .keep_all = TRUE) %>%
+    filter(!is.na(content), content != "", nchar(content) > 100) %>%
+    mutate(unique_id = paste0("doc_", row_number()))
 
-if (!exists("feminizid_dfm_trimmed") && file.exists(dfm_file)) {
-  message("Lade gespeicherte DFM...")
-  feminizid_dfm_trimmed <- readRDS(dfm_file)
-  message("✓ DFM geladen: ", nfeat(feminizid_dfm_trimmed), " Features")
-}
+  message("Articles for corpus: ", nrow(corpus_data))
 
-# Korpus erstellen (falls noch nicht vorhanden)
-if (exists("corpus_data") && !exists("feminizid_corpus")) {
-  
-  # Text bereinigen
   corpus_data$clean_content <- corpus_data$content %>%
-    str_remove_all("<[^>]+>") %>%  # HTML-Tags
-    str_remove_all("\\n|\\t|\\r") %>%  # Zeilenumbrüche
-    str_remove_all("https?://\\S+") %>%  # URLs
-    str_squish()  # Mehrfache Leerzeichen
-  
-  # Finale Filterung
+    str_remove_all("<[^>]+>") %>%
+    str_remove_all("\\n|\\t|\\r") %>%
+    str_remove_all("https?://\\S+") %>%
+    str_squish()
+
   corpus_data <- corpus_data %>%
     filter(!is.na(clean_content), clean_content != "", nchar(clean_content) > 50)
-  
-  # Quanteda Korpus erstellen
-  feminizid_corpus <- corpus(corpus_data, 
-                            text_field = "clean_content",
-                            docid_field = "unique_id")
-  
-  # Metadaten hinzufügen
+
+  feminizid_corpus <- corpus(corpus_data,
+                             text_field = "clean_content",
+                             docid_field = "unique_id")
+
   docvars(feminizid_corpus, "original_id") <- corpus_data$id
   docvars(feminizid_corpus, "medium") <- corpus_data$medium_name
   docvars(feminizid_corpus, "date") <- corpus_data$pub_date
   docvars(feminizid_corpus, "year") <- corpus_data$year
   docvars(feminizid_corpus, "headline") <- corpus_data$head
   docvars(feminizid_corpus, "char_count") <- as.numeric(corpus_data$char_count)
-  
-  # Korpus-Übersicht
-  cat("=== QUANTEDA KORPUS ===\n")
-  cat("Dokumente:", ndoc(feminizid_corpus), "\n")
+
+  cat("=== QUANTEDA CORPUS ===\n")
+  cat("Documents:", ndoc(feminizid_corpus), "\n")
   cat("Tokens:", sum(ntoken(feminizid_corpus)), "\n")
-  cat("Zeitraum:", min(corpus_data$pub_date, na.rm = TRUE), "bis", max(corpus_data$pub_date, na.rm = TRUE), "\n")
-  
+  cat("Range:", min(corpus_data$pub_date, na.rm = TRUE), "to", max(corpus_data$pub_date, na.rm = TRUE), "\n")
+
   print(summary(feminizid_corpus, n = 3))
-}
-```
 
-```{r load-existing-dfm}
-# Gespeicherte DFM laden (falls vorhanden)
-corpus_file <- paste0("data/feminizid_corpus_", format(Sys.Date(), "%Y%m%d"), ".rds")
-dfm_file <- paste0("data/feminizid_dfm_", format(Sys.Date(), "%Y%m%d"), ".rds")
-
-if (file.exists(dfm_file)) {
-  message("Lade gespeicherte DFM...")
-  start_time <- Sys.time()
-  feminizid_dfm_trimmed <- readRDS(dfm_file)
-  load_time <- round(as.numeric(Sys.time() - start_time), 1)
-  
-  message("✓ DFM geladen: ", nfeat(feminizid_dfm_trimmed), " Features (", load_time, "s)")
-  
-  # Zeige Info
-  cat("=== GELADENE DFM ===\n")
-  cat("Features:", nfeat(feminizid_dfm_trimmed), "\n")
-  cat("Dokumente:", ndoc(feminizid_dfm_trimmed), "\n")
-  cat("Sparsity:", round(sparsity(feminizid_dfm_trimmed), 3), "\n")
-  cat("Dateigröße:", round(file.size(dfm_file) / 1024^2, 1), "MB\n")
-} else {
-  message("Keine gespeicherte DFM gefunden - führen Sie text-preprocessing aus")
+  save_checkpoint(feminizid_corpus, "feminizid_corpus")
 }
 ```
 
 ```{r text-preprocessing}
-# Text-Preprocessing (kann immer ausgeführt werden)
-if (exists("feminizid_corpus")) {
+stopifnot(exists("feminizid_corpus"))
   
-  # Deutsche Stoppwörter laden
+  # Deutsche Stoppw\u00f6rter laden
   german_stopwords <- readLines("german_stopwords_full.txt", encoding = "UTF-8")
   german_stopwords <- german_stopwords[german_stopwords != ""]
   
-  # Medienspezifische Stoppwörter
+  # Medienspezifische Stoppw\u00f6rter
   media_stopwords <- c("uhr", "jahr", "jahre", "jahren", "prozent", "franken", "chf",
                       "artikel", "bericht", "zeitung", "medium", "redaktion", "autor",
                       "quelle", "foto", "bild", "video", "online", "www", "http",
                       "montag", "dienstag", "mittwoch", "donnerstag", "freitag",
-                      "samstag", "sonntag", "januar", "februar", "märz", "april",
+                      "samstag", "sonntag", "januar", "februar", "m\u00e4rz", "april",
                       "mai", "juni", "juli", "august", "september", "oktober",
                       "november", "dezember", "schweiz", "schweizer", "schweizerin")
   
   all_stopwords <- c(german_stopwords, media_stopwords)
   
-  # Multi-Word-Expressions (Wortpaare) definieren
-  multiword_patterns <- list(
-    # Gewalt-Begriffe
-    c("häusliche", "gewalt"),
-    c("partnerschafts", "gewalt"), 
-    c("partner", "gewalt"),
-    c("beziehungs", "gewalt"),
-    c("sexuelle", "gewalt"),
-    c("körperliche", "gewalt"),
-    c("psychische", "gewalt"),
-    
-    # Feminizid-Begriffe
-    c("tötung", "frau"),
-    c("mord", "frau"),
-    c("gewalt", "frauen"),
-    
-    # Familien-Begriffe
-    c("familien", "drama"),
-    c("familien", "tragödie"),
-    c("beziehungs", "tat"),
-    c("ehe", "streit"),
-    
-    # Justiz-Begriffe
-    c("häuslicher", "gewalt"),  # Alternative Schreibweise
-    c("opfer", "schutz"),
-    c("gewalt", "schutz")
-  )
   
   # Tokenisierung und Preprocessing
   feminizid_tokens <- tokens(feminizid_corpus,
@@ -472,16 +411,50 @@ if (exists("feminizid_corpus")) {
     tokens_tolower() %>%
     tokens_remove(all_stopwords, min_nchar = 3)
   
+  # ERST Stemming (reduziert alle Flexionsformen auf Grundform)
+  feminizid_tokens <- tokens_wordstem(feminizid_tokens, language = "de")
+  
+  # DANN Multi-Word-Expressions (jetzt mit Grundformen)
+  # Vereinfachte Patterns - nur Grundformen n\u00f6tig
+  simplified_patterns <- list(
+    # Gewalt-Begriffe (nur Grundformen nach Stemming)
+    c("hauslich", "gewalt"),      # h\u00e4usliche/h\u00e4uslicher \u2192 h\u00e4usl
+    c("partnerschaft", "gewalt"), 
+    c("partner", "gewalt"),
+    c("bezieh", "gewalt"),     # beziehungs \u2192 bezieh
+    c("sexuell", "gewalt"),    # sexuelle/sexueller \u2192 sexuell
+    c("k\u00f6rperl", "gewalt"),    # k\u00f6rperliche/k\u00f6rperlicher \u2192 k\u00f6rperl
+    c("psychisch", "gewalt"),
+    
+    # Feminizid-Begriffe
+    c("t\u00f6t", "frau"),          # t\u00f6tung \u2192 t\u00f6t
+    c("mord", "frau"),
+    c("gewalt", "frau"),
+    
+    # Familien-Begriffe
+    c("famili", "drama"),      # familien \u2192 famili
+    c("famili", "trag\u00f6di"),    # trag\u00f6die \u2192 trag\u00f6di
+    c("bezieh", "tat"),        # beziehungs \u2192 bezieh
+    c("eh", "streit"),         # ehe \u2192 eh
+    
+    # Justiz-Begriffe
+    c("opf", "schutz"),        # opfer \u2192 opf
+    c("gewalt", "schutz")
+  )
+  
   # Multi-Word-Expressions zu Compound-Tokens zusammenfassen
-  for (pattern in multiword_patterns) {
+  for (pattern in simplified_patterns) {
     feminizid_tokens <- tokens_compound(feminizid_tokens, 
                                        pattern = phrase(paste(pattern, collapse = " ")),
                                        concatenator = "_")
   }
   
-  cat("=== MULTI-WORD-EXPRESSIONS ===\n")
-  cat("Definierte Wortpaare:", length(multiword_patterns), "\n")
-  cat("Beispiele: häusliche_gewalt, partnerschafts_gewalt, tötung_frau\n")
+  cat("=== TEXT-PREPROCESSING SCHRITTE ===\n")
+  cat("1. ERST Stemming: Flexionsformen reduziert\n")
+  cat("   h\u00e4usliche/h\u00e4uslicher \u2192 h\u00e4usl, t\u00f6tung \u2192 t\u00f6t, frauen \u2192 frau\n")
+  cat("2. DANN Multi-Word-Expressions:", length(simplified_patterns), "Wortpaare\n")
+  cat("   h\u00e4usl + gewalt \u2192 h\u00e4usl_gewalt (erfasst ALLE Flexionsformen!)\n")
+  cat("3. Vorteil: Ein Pattern erfasst alle Varianten!\n")
   
   # Document-Feature-Matrix
   feminizid_dfm <- dfm(feminizid_tokens)
@@ -499,64 +472,39 @@ if (exists("feminizid_corpus")) {
   cat("Nach Trimming:", nfeat(feminizid_dfm_trimmed), "\n")
   cat("Sparsity:", round(sparsity(feminizid_dfm_trimmed), 3), "\n")
   
-  # Häufigste Wörter
+  # H\u00e4ufigste W\u00f6rter
   if (nfeat(feminizid_dfm_trimmed) > 0) {
     top_features <- topfeatures(feminizid_dfm_trimmed, 25)
-    cat("\n=== HÄUFIGSTE WÖRTER ===\n")
+    cat("\n=== H\u00c4UFIGSTE W\u00d6RTER ===\n")
     print(top_features)
   } else {
-    cat("\n⚠️ Keine Features nach Trimming - Parameter anpassen!\n")
+    cat("\nWARN: Keine Features nach Trimming - Parameter anpassen!\n")
   }
   
-} else {
-  message("Kein Korpus verfügbar - führen Sie create-corpus aus")
 }
 ```
 
-```{r save-dfm}
-# DFM speichern (nur wenn erfolgreich erstellt) - optimiert für große Objekte
+```{r checkpoint-save-dfm}
+# Checkpoint save (DFM and optional corpus)
 if (exists("feminizid_dfm_trimmed") && nfeat(feminizid_dfm_trimmed) > 0) {
-  corpus_file <- paste0("data/feminizid_corpus_", format(Sys.Date(), "%Y%m%d"), ".rds")
-  dfm_file <- paste0("data/feminizid_dfm_", format(Sys.Date(), "%Y%m%d"), ".rds")
-  
-  # Optimiertes Speichern mit Kompression
-  # Option 1: Vollständiges Speichern (langsam, aber komplett)
-  if (FALSE) {  # Auf TRUE setzen wenn vollständiges Speichern gewünscht
-    message("Speichere Korpus (kann einige Minuten dauern)...")
-    saveRDS(feminizid_corpus, corpus_file, compress = "xz")
-    
-    message("Speichere DFM (kann einige Minuten dauern)...")
-    saveRDS(feminizid_dfm_trimmed, dfm_file, compress = "xz")
+  save_checkpoint(feminizid_dfm_trimmed, "feminizid_dfm")
+  if (exists("SAVE_CORPUS") && SAVE_CORPUS == TRUE && exists("feminizid_corpus")) {
+    save_checkpoint(feminizid_corpus, "feminizid_corpus")
   }
-  
-  # Option 2: Nur DFM speichern (schneller, für Analyse ausreichend)
-  message("Speichere nur DFM (schneller)...")
-  saveRDS(feminizid_dfm_trimmed, dfm_file, compress = "xz")
-  
-  # Dateigröße anzeigen
-  corpus_size <- round(file.size(corpus_file) / 1024^2, 1)
-  dfm_size <- round(file.size(dfm_file) / 1024^2, 1)
-  
-  message("✓ Korpus gespeichert: ", corpus_file, " (", corpus_size, " MB)")
-  message("✓ DFM gespeichert: ", dfm_file, " (", dfm_size, " MB)")
-  
-  # Speicher-Info
-  cat("Objekt-Größen im Speicher:\n")
-  cat("Korpus:", round(object.size(feminizid_corpus) / 1024^2, 1), "MB\n")
-  cat("DFM:", round(object.size(feminizid_dfm_trimmed) / 1024^2, 1), "MB\n")
-  
-} else {
-  message("Keine DFM zum Speichern verfügbar")
 }
 ```
 
 ```{r visualization}
-if (exists("feminizid_dfm_trimmed")) {
+# SMART VISUALIZATION: Auto-Skip wenn DFM fehlt
+if (!exists("feminizid_dfm_trimmed")) {
+  message("ERROR: Keine DFM - f\u00fchre erst text-preprocessing aus")
+} else {
+  message("Starte Visualisierungen...")
   
-  # Wordcloud der häufigsten Begriffe
+  # Wordcloud der h\u00e4ufigsten Begriffe
   set.seed(123)
   
-  # Versuche quanteda.textplots, falls nicht verfügbar verwende wordcloud
+  # Versuche quanteda.textplots, falls nicht verf\u00fcgbar verwende wordcloud
   if ("textplot_wordcloud" %in% ls("package:quanteda.textplots")) {
     textplot_wordcloud(feminizid_dfm_trimmed, 
                       min_count = 30,
@@ -571,59 +519,59 @@ if (exists("feminizid_dfm_trimmed")) {
              random.order = FALSE)
   }
   
-  # Feature-Häufigkeit über Zeit (normalisiert)
+  # Feature-H\u00e4ufigkeit \u00fcber Zeit (normalisiert)
   if (exists("feminizid_corpus")) {
     # Top 10 Features nach Jahren
     top_terms <- names(topfeatures(feminizid_dfm_trimmed, 10))
     
-    # Häufigkeit dieser Terms über Jahre
+    # H\u00e4ufigkeit dieser Terms \u00fcber Jahre
     yearly_terms <- dfm_group(feminizid_dfm_trimmed, groups = docvars(feminizid_dfm_trimmed, "year"))
     
-    # Artikel pro Jahr für Normalisierung
+    # Artikel pro Jahr f\u00fcr Normalisierung
     articles_per_year <- feminizid_corpus %>%
       docvars() %>%
       mutate(year = as.numeric(year)) %>%  # Jahr als numerisch konvertieren
       count(year, name = "total_articles") %>%
       filter(year >= 2000, year <= 2025)
     
-    # Korrekte Konvertierung für quanteda 3.0+ - ohne doc_id Spalte
+    # Korrekte Konvertierung f\u00fcr quanteda 3.0+ - ohne doc_id Spalte
     term_data <- convert(yearly_terms[, top_terms], to = "data.frame") %>%
       select(-doc_id) %>%  # doc_id Spalte entfernen
       mutate(year = as.numeric(rownames(yearly_terms)))
     
-    # Absolute Häufigkeiten
+    # Absolute H\u00e4ufigkeiten
     term_timeline_abs <- term_data %>%
       pivot_longer(-year, names_to = "term", values_to = "frequency") %>%
       filter(year >= 2000, year <= 2025)
     
-    # Normalisierte Häufigkeiten (pro 1000 Artikel)
+    # Normalisierte H\u00e4ufigkeiten (pro 1000 Artikel)
     term_timeline_norm <- term_timeline_abs %>%
       left_join(articles_per_year, by = "year") %>%
       mutate(frequency_per_1000 = (frequency / total_articles) * 1000) %>%
       filter(!is.na(total_articles), total_articles > 10)  # Nur Jahre mit >10 Artikeln
     
-    # Plot 1: Absolute Häufigkeiten
+    # Plot 1: Absolute H\u00e4ufigkeiten
     p7a <- ggplot(term_timeline_abs, aes(x = year, y = frequency, color = term)) +
       geom_line(size = 1, alpha = 0.8) +
       theme_minimal() +
-      labs(title = "Häufigste Begriffe über Zeit (absolut)", 
-           x = "Jahr", y = "Absolute Häufigkeit", color = "Begriff") +
+      labs(title = "H\u00e4ufigste Begriffe \u00fcber Zeit (absolut)", 
+           x = "Jahr", y = "Absolute H\u00e4ufigkeit", color = "Begriff") +
       theme(legend.position = "bottom")
     
-    # Plot 2: Normalisierte Häufigkeiten (pro 1000 Artikel)
+    # Plot 2: Normalisierte H\u00e4ufigkeiten (pro 1000 Artikel)
     p7b <- ggplot(term_timeline_norm, aes(x = year, y = frequency_per_1000, color = term)) +
       geom_line(size = 1, alpha = 0.8) +
       theme_minimal() +
-      labs(title = "Häufigste Begriffe über Zeit (normalisiert pro 1000 Artikel)", 
-           x = "Jahr", y = "Häufigkeit pro 1000 Artikel", color = "Begriff") +
+      labs(title = "H\u00e4ufigste Begriffe \u00fcber Zeit (normalisiert pro 1000 Artikel)", 
+           x = "Jahr", y = "H\u00e4ufigkeit pro 1000 Artikel", color = "Begriff") +
       theme(legend.position = "bottom")
     
-    # Plot 3: Artikel-Verteilung über Zeit (zur Kontrolle)
+    # Plot 3: Artikel-Verteilung \u00fcber Zeit (zur Kontrolle)
     p7c <- ggplot(articles_per_year, aes(x = year, y = total_articles)) +
       geom_line(size = 1, color = "darkblue") +
       geom_point(size = 2, color = "darkblue") +
       theme_minimal() +
-      labs(title = "Artikel-Verteilung über Zeit", 
+      labs(title = "Artikel-Verteilung \u00fcber Zeit", 
            x = "Jahr", y = "Anzahl Artikel") +
       scale_y_continuous(labels = scales::comma)
     
@@ -646,12 +594,264 @@ if (exists("feminizid_dfm_trimmed")) {
     cat("Max Artikel pro Jahr:", summary_stats$max_articles, "\n")
     cat("Durchschnitt:", summary_stats$mean_articles, "\n")
     cat("Median:", summary_stats$median_articles, "\n")
-    cat("Verhältnis Max/Min:", summary_stats$ratio_max_min, "x\n")
+    cat("Verh\u00e4ltnis Max/Min:", summary_stats$ratio_max_min, "x\n")
     
     if (summary_stats$ratio_max_min > 5) {
-      cat("⚠️ Starke Verzerrung erkannt - normalisierte Darstellung empfohlen!\n")
+      cat("WARN: Starke Verzerrung erkannt - normalisierte Darstellung empfohlen!\n")
     }
   }
+}
+```
+
+## Word2Vec frame shift (diachronic)
+
+Train one Word2Vec model per time window and compare nearest neighbors
+across periods. Use the checkpoint load block to resume without retraining.
+
+```{r checkpoint-load-word2vec}
+# Checkpoint load (Word2Vec)
+load_checkpoint("word2vec_models", "word2vec_models")
+load_checkpoint("word2vec_frame_shifts", "all_frame_shifts")
+```
+
+```{r word2vec-setup}
+stopifnot(exists("feminizid_corpus"))
+library(word2vec)
+  
+  # Zeitfenster definieren (5-Jahres-Fenster f\u00fcr ausreichend Daten)
+  time_windows <- list(
+    "2000-2004" = c(2000, 2004),
+    "2005-2009" = c(2005, 2009), 
+    "2010-2014" = c(2010, 2014),
+    "2015-2019" = c(2015, 2019),
+    "2020-2025" = c(2020, 2025)
+  )
+  
+  # Zielw\u00f6rter f\u00fcr Frame-Shift-Analyse
+  target_words <- c(
+    # Feminizid-Begriffe
+    "feminizid", "femizid", "frauenmord",
+    # Gewalt-Begriffe (Grundformen nach Stemming)
+    "hauslich_gewalt", "partnerschaft_gewalt", "bezieh_gewalt",
+    # Familien-Framing
+    "famili_drama", "famili_tragodi", "bezieh_tat",
+    # T\u00e4ter-Begriffe
+    "ehemann", "partner", "freund", "expartner",
+    # Opfer-Begriffe
+    "frau", "ehefrau", "partnerin", "opf"
+  )
+  
+  cat("=== WORD2VEC DIACHRONE ANALYSE ===\n")
+  cat("Time windows:", length(time_windows), "\n")
+  cat("Target words:", length(target_words), "\n")
+  cat("Strategy: one model per window\n")
+```
+
+```{r word2vec-training}
+stopifnot(exists("feminizid_corpus"))
+  
+  # F\u00fcr jedes Zeitfenster separates Word2Vec-Modell trainieren
+  word2vec_models <- list()
+  word2vec_embeddings <- list()
+  
+  for (window_name in names(time_windows)) {
+    window_years <- time_windows[[window_name]]
+    
+    # Korpus f\u00fcr Zeitfenster filtern
+    window_corpus <- corpus_subset(feminizid_corpus, 
+                                  year >= window_years[1] & year <= window_years[2])
+    
+    # Mindestanzahl Dokumente pr\u00fcfen
+    n_docs <- ndoc(window_corpus)
+    if (n_docs < 100) {
+      cat("WARN: Zeitfenster", window_name, "hat nur", n_docs, "Dokumente - \u00fcbersprungen\n")
+      next
+    }
+    
+    # Text f\u00fcr Word2Vec vorbereiten (bereits gestemmte Tokens verwenden)
+    window_tokens <- tokens(window_corpus,
+                           remove_punct = TRUE,
+                           remove_symbols = TRUE,
+                           remove_numbers = TRUE,
+                           remove_url = TRUE) %>%
+      tokens_tolower() %>%
+      tokens_remove(all_stopwords, min_nchar = 3) %>%
+      tokens_wordstem(language = "de")
+    
+    # Multi-Word-Expressions anwenden
+    for (pattern in simplified_patterns) {
+      window_tokens <- tokens_compound(window_tokens, 
+                                      pattern = phrase(paste(pattern, collapse = " ")),
+                                      concatenator = "_")
+    }
+    
+    # Zu Text f\u00fcr Word2Vec konvertieren
+    window_text <- sapply(window_tokens, paste, collapse = " ")
+    window_text <- window_text[nchar(window_text) > 50]  # Nur l\u00e4ngere Texte
+    
+    if (length(window_text) < 50) {
+      cat("WARN: Zeitfenster", window_name, "hat zu wenig Text - \u00fcbersprungen\n")
+      next
+    }
+    
+    # Word2Vec-Modell trainieren
+    cat("Training Word2Vec f\u00fcr", window_name, "(", n_docs, "Dokumente,", length(window_text), "Texte)...\n")
+    
+    w2v_model <- word2vec(x = window_text, 
+                         type = "skip-gram",  # Skip-gram besser f\u00fcr seltene W\u00f6rter
+                         dim = 100,           # 100 Dimensionen
+                         iter = 20,           # 20 Iterationen
+                         min_count = 5,       # Min. 5 Vorkommen
+                         window = 5)          # Kontext-Fenster 5 W\u00f6rter
+    
+    word2vec_models[[window_name]] <- w2v_model
+    
+    # Embeddings f\u00fcr Zielw\u00f6rter extrahieren
+    available_words <- intersect(target_words, rownames(as.matrix(w2v_model)))
+    if (length(available_words) > 0) {
+      embeddings <- predict(w2v_model, available_words, type = "embedding")
+      word2vec_embeddings[[window_name]] <- embeddings
+      cat("\u2713 Embeddings f\u00fcr", length(available_words), "Zielw\u00f6rter extrahiert\n")
+    } else {
+      cat("WARN: Keine Zielw\u00f6rter in", window_name, "gefunden\n")
+    }
+  }
+  
+  cat("\n=== TRAINING ABGESCHLOSSEN ===\n")
+  cat("Erfolgreiche Modelle:", length(word2vec_models), "\n")
+  save_checkpoint(word2vec_models, "word2vec_models")
+```
+
+```{r word2vec-frame-shift}
+if (length(word2vec_models) >= 2) {
+  
+  # Frame-Shift-Analyse: Was ist in der N\u00e4he von was?
+  frame_shift_results <- list()
+  
+  for (target_word in target_words) {
+    
+    # F\u00fcr jedes Zeitfenster die n\u00e4chsten Nachbarn finden
+    neighbors_over_time <- list()
+    
+    for (window_name in names(word2vec_models)) {
+      model <- word2vec_models[[window_name]]
+      
+      # Pr\u00fcfen ob Wort im Modell vorhanden
+      if (target_word %in% rownames(as.matrix(model))) {
+        
+        # Top 10 \u00e4hnlichste W\u00f6rter finden
+        similar_words <- predict(model, target_word, type = "nearest", top_n = 10)
+        
+        if (!is.null(similar_words) && length(similar_words) > 0) {
+          neighbors_df <- data.frame(
+            period = window_name,
+            target = target_word,
+            neighbor = similar_words[[1]]$term2,
+            similarity = similar_words[[1]]$similarity,
+            rank = similar_words[[1]]$rank,
+            stringsAsFactors = FALSE
+          )
+          neighbors_over_time[[window_name]] <- neighbors_df
+        }
+      }
+    }
+    
+    # Kombiniere alle Zeitfenster f\u00fcr dieses Zielwort
+    if (length(neighbors_over_time) > 0) {
+      combined_neighbors <- do.call(rbind, neighbors_over_time)
+      frame_shift_results[[target_word]] <- combined_neighbors
+    }
+  }
+  
+  # Alle Ergebnisse kombinieren
+  if (length(frame_shift_results) > 0) {
+    all_frame_shifts <- do.call(rbind, frame_shift_results)
+    save_checkpoint(all_frame_shifts, "word2vec_frame_shifts")
+    
+    cat("=== FRAME-SHIFT ANALYSE ===\n")
+    cat("Analysierte W\u00f6rter:", length(frame_shift_results), "\n")
+    cat("Gesamt Nachbar-Beziehungen:", nrow(all_frame_shifts), "\n")
+    
+    # Beispiel: Top-Ver\u00e4nderungen f\u00fcr "hauslich_gewalt"
+    if ("hauslich_gewalt" %in% names(frame_shift_results)) {
+      cat("\n=== BEISPIEL: h\u00e4usliche_gewalt Frame-Shifts ===\n")
+      hauslich_shifts <- frame_shift_results[["hauslich_gewalt"]]
+      
+      # Top 3 Nachbarn pro Zeitfenster
+      top_neighbors <- hauslich_shifts %>%
+        filter(rank <= 3) %>%
+        select(period, neighbor, similarity) %>%
+        arrange(period, -similarity)
+      
+      print(top_neighbors)
+    }
+  }
+}
+```
+
+```{r word2vec-visualization}
+if (exists("all_frame_shifts")) {
+  
+  # Visualisierung 1: Heatmap der Frame-Shifts
+  library(ggplot2)
+  library(dplyr)
+  
+  # Top-Nachbarn \u00fcber alle Zeitfenster
+  top_shifts <- all_frame_shifts %>%
+    filter(rank <= 5) %>%
+    group_by(target, neighbor) %>%
+    summarise(avg_similarity = mean(similarity), 
+              periods_present = n(),
+              .groups = 'drop') %>%
+    filter(periods_present >= 2) %>%  # Mindestens in 2 Zeitfenstern
+    arrange(target, -avg_similarity)
+  
+  # Heatmap f\u00fcr ausgew\u00e4hlte Zielw\u00f6rter
+  selected_targets <- c("hauslich_gewalt", "feminizid", "famili_drama")
+  available_targets <- intersect(selected_targets, unique(all_frame_shifts$target))
+  
+  if (length(available_targets) > 0) {
+    heatmap_data <- all_frame_shifts %>%
+      filter(target %in% available_targets, rank <= 5) %>%
+      select(period, target, neighbor, similarity)
+    
+    p_heatmap <- ggplot(heatmap_data, aes(x = period, y = neighbor, fill = similarity)) +
+      geom_tile(color = "white") +
+      facet_wrap(~target, scales = "free_y") +
+      scale_fill_gradient(low = "white", high = "darkred", name = "\u00c4hnlichkeit") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1),
+            axis.text.y = element_text(size = 8)) +
+      labs(title = "Word2Vec Frame-Shifts \u00fcber Zeit",
+           subtitle = "Welche W\u00f6rter sind in der N\u00e4he der Zielw\u00f6rter?",
+           x = "Zeitfenster", y = "Nachbarw\u00f6rter")
+    
+    print(p_heatmap)
+  }
+  
+  # Visualisierung 2: Stabilit\u00e4t vs. Wandel
+  stability_analysis <- all_frame_shifts %>%
+    group_by(target, neighbor) %>%
+    summarise(
+      periods_present = n(),
+      avg_similarity = mean(similarity),
+      similarity_sd = sd(similarity),
+      .groups = 'drop'
+    ) %>%
+    mutate(
+      stability = case_when(
+        periods_present >= 4 & similarity_sd < 0.1 ~ "Stabil",
+        periods_present >= 3 & similarity_sd < 0.2 ~ "M\u00e4\u00dfig stabil", 
+        TRUE ~ "Wandelnd"
+      )
+    )
+  
+  cat("\n=== STABILIT\u00c4T DER FRAME-BEZIEHUNGEN ===\n")
+  stability_summary <- stability_analysis %>%
+    count(stability) %>%
+    mutate(percentage = round(n / sum(n) * 100, 1))
+  
+  print(stability_summary)
 }
 ```
 
