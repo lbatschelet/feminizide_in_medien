@@ -428,12 +428,40 @@ if (exists("feminizid_corpus")) {
   media_stopwords <- c("uhr", "jahr", "jahre", "jahren", "prozent", "franken", "chf",
                       "artikel", "bericht", "zeitung", "medium", "redaktion", "autor",
                       "quelle", "foto", "bild", "video", "online", "www", "http",
-                      "montag", "dienstag", "mittwoch", "donnerstag", "freitag", 
+                      "montag", "dienstag", "mittwoch", "donnerstag", "freitag",
                       "samstag", "sonntag", "januar", "februar", "märz", "april",
                       "mai", "juni", "juli", "august", "september", "oktober",
                       "november", "dezember", "schweiz", "schweizer", "schweizerin")
   
   all_stopwords <- c(german_stopwords, media_stopwords)
+  
+  # Multi-Word-Expressions (Wortpaare) definieren
+  multiword_patterns <- list(
+    # Gewalt-Begriffe
+    c("häusliche", "gewalt"),
+    c("partnerschafts", "gewalt"), 
+    c("partner", "gewalt"),
+    c("beziehungs", "gewalt"),
+    c("sexuelle", "gewalt"),
+    c("körperliche", "gewalt"),
+    c("psychische", "gewalt"),
+    
+    # Feminizid-Begriffe
+    c("tötung", "frau"),
+    c("mord", "frau"),
+    c("gewalt", "frauen"),
+    
+    # Familien-Begriffe
+    c("familien", "drama"),
+    c("familien", "tragödie"),
+    c("beziehungs", "tat"),
+    c("ehe", "streit"),
+    
+    # Justiz-Begriffe
+    c("häuslicher", "gewalt"),  # Alternative Schreibweise
+    c("opfer", "schutz"),
+    c("gewalt", "schutz")
+  )
   
   # Tokenisierung und Preprocessing
   feminizid_tokens <- tokens(feminizid_corpus,
@@ -443,6 +471,17 @@ if (exists("feminizid_corpus")) {
                             remove_url = TRUE) %>%
     tokens_tolower() %>%
     tokens_remove(all_stopwords, min_nchar = 3)
+  
+  # Multi-Word-Expressions zu Compound-Tokens zusammenfassen
+  for (pattern in multiword_patterns) {
+    feminizid_tokens <- tokens_compound(feminizid_tokens, 
+                                       pattern = phrase(paste(pattern, collapse = " ")),
+                                       concatenator = "_")
+  }
+  
+  cat("=== MULTI-WORD-EXPRESSIONS ===\n")
+  cat("Definierte Wortpaare:", length(multiword_patterns), "\n")
+  cat("Beispiele: häusliche_gewalt, partnerschafts_gewalt, tötung_frau\n")
   
   # Document-Feature-Matrix
   feminizid_dfm <- dfm(feminizid_tokens)
@@ -532,32 +571,88 @@ if (exists("feminizid_dfm_trimmed")) {
              random.order = FALSE)
   }
   
-  # Feature-Häufigkeit über Zeit
+  # Feature-Häufigkeit über Zeit (normalisiert)
   if (exists("feminizid_corpus")) {
     # Top 10 Features nach Jahren
     top_terms <- names(topfeatures(feminizid_dfm_trimmed, 10))
     
-     # Häufigkeit dieser Terms über Jahre
-     yearly_terms <- dfm_group(feminizid_dfm_trimmed, groups = docvars(feminizid_dfm_trimmed, "year"))
-     
-     # Korrekte Konvertierung für quanteda 3.0+ - ohne doc_id Spalte
-     term_data <- convert(yearly_terms[, top_terms], to = "data.frame") %>%
-       select(-doc_id) %>%  # doc_id Spalte entfernen
-       mutate(year = as.numeric(rownames(yearly_terms)))
-     
-     term_timeline <- term_data %>%
-       pivot_longer(-year, names_to = "term", values_to = "frequency") %>%
-       filter(year >= 2000, year <= 2025)
+    # Häufigkeit dieser Terms über Jahre
+    yearly_terms <- dfm_group(feminizid_dfm_trimmed, groups = docvars(feminizid_dfm_trimmed, "year"))
     
-    p7 <- ggplot(term_timeline, aes(x = year, y = frequency, color = term)) +
+    # Artikel pro Jahr für Normalisierung
+    articles_per_year <- feminizid_corpus %>%
+      docvars() %>%
+      mutate(year = as.numeric(year)) %>%  # Jahr als numerisch konvertieren
+      count(year, name = "total_articles") %>%
+      filter(year >= 2000, year <= 2025)
+    
+    # Korrekte Konvertierung für quanteda 3.0+ - ohne doc_id Spalte
+    term_data <- convert(yearly_terms[, top_terms], to = "data.frame") %>%
+      select(-doc_id) %>%  # doc_id Spalte entfernen
+      mutate(year = as.numeric(rownames(yearly_terms)))
+    
+    # Absolute Häufigkeiten
+    term_timeline_abs <- term_data %>%
+      pivot_longer(-year, names_to = "term", values_to = "frequency") %>%
+      filter(year >= 2000, year <= 2025)
+    
+    # Normalisierte Häufigkeiten (pro 1000 Artikel)
+    term_timeline_norm <- term_timeline_abs %>%
+      left_join(articles_per_year, by = "year") %>%
+      mutate(frequency_per_1000 = (frequency / total_articles) * 1000) %>%
+      filter(!is.na(total_articles), total_articles > 10)  # Nur Jahre mit >10 Artikeln
+    
+    # Plot 1: Absolute Häufigkeiten
+    p7a <- ggplot(term_timeline_abs, aes(x = year, y = frequency, color = term)) +
       geom_line(size = 1, alpha = 0.8) +
       theme_minimal() +
-      labs(title = "Häufigste Begriffe über Zeit", 
-           x = "Jahr", y = "Häufigkeit", color = "Begriff") +
+      labs(title = "Häufigste Begriffe über Zeit (absolut)", 
+           x = "Jahr", y = "Absolute Häufigkeit", color = "Begriff") +
       theme(legend.position = "bottom")
     
-    print(p7)
+    # Plot 2: Normalisierte Häufigkeiten (pro 1000 Artikel)
+    p7b <- ggplot(term_timeline_norm, aes(x = year, y = frequency_per_1000, color = term)) +
+      geom_line(size = 1, alpha = 0.8) +
+      theme_minimal() +
+      labs(title = "Häufigste Begriffe über Zeit (normalisiert pro 1000 Artikel)", 
+           x = "Jahr", y = "Häufigkeit pro 1000 Artikel", color = "Begriff") +
+      theme(legend.position = "bottom")
+    
+    # Plot 3: Artikel-Verteilung über Zeit (zur Kontrolle)
+    p7c <- ggplot(articles_per_year, aes(x = year, y = total_articles)) +
+      geom_line(size = 1, color = "darkblue") +
+      geom_point(size = 2, color = "darkblue") +
+      theme_minimal() +
+      labs(title = "Artikel-Verteilung über Zeit", 
+           x = "Jahr", y = "Anzahl Artikel") +
+      scale_y_continuous(labels = scales::comma)
+    
+    print(p7a)
+    print(p7b) 
+    print(p7c)
+    
+    # Zusammenfassung der Normalisierung
+    cat("\n=== NORMALISIERUNGS-ANALYSE ===\n")
+    summary_stats <- articles_per_year %>%
+      summarise(
+        min_articles = min(total_articles),
+        max_articles = max(total_articles),
+        mean_articles = round(mean(total_articles)),
+        median_articles = median(total_articles),
+        ratio_max_min = round(max(total_articles) / min(total_articles), 1)
+      )
+    
+    cat("Min Artikel pro Jahr:", summary_stats$min_articles, "\n")
+    cat("Max Artikel pro Jahr:", summary_stats$max_articles, "\n")
+    cat("Durchschnitt:", summary_stats$mean_articles, "\n")
+    cat("Median:", summary_stats$median_articles, "\n")
+    cat("Verhältnis Max/Min:", summary_stats$ratio_max_min, "x\n")
+    
+    if (summary_stats$ratio_max_min > 5) {
+      cat("⚠️ Starke Verzerrung erkannt - normalisierte Darstellung empfohlen!\n")
+    }
   }
 }
 ```
-```
+
+
