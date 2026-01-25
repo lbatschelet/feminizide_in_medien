@@ -4,6 +4,11 @@ output: html_notebook
 encoding: UTF-8
 ---
 
+## Introduction
+Media coverage of the topic of femicide has always been controversial. The term “femicide” itself is the subject of complex debate in the media and politics. For example, in its statement on Interpellation 20.3505, the Federal Council said: “There are currently no plans to use the term ‘femicide’,” in response to the question of whether “\[it\] intends to promote the use of the term ‘femicide’ in diplomacy and in relations with the media” (German: „\[er\] die Verwendung des Terminus ‘Femizid’ in der Diplomatie und im Umgang mit den Medien zu fördern \[beabsichtigt\]”). However, it also points out that “\[t\]he FSO, on the other hand, \[reports\] the gender of the victims and the relationship between the victims and the accused in the police crime statistics (PKS) for violent crimes, so that homicides against women are visible in the statistics.” Information such as this can then be used by projects like stopfemizid.ch to crowdsource reports of such incidents. However, the debate surrounding the use of different terms has now progressed further, with the term “feminicide” gradually becoming established. (As we can also show in our subsequent analysis.) The term was coined by Mexican feminist activist Marcela Lagarde, who wanted to use the neologism “feminicidio” expanding the concept of “femicidio” to include, among other things, the dimension of institutional violence and responsibility [cf. @saccomano_femicide_2015, pp. 5; as seen in @ggf_femizid_2023]. However, @saccomano_femicide_2015 <!-- [p. 33] --> notes that the popularization of the term has also led to confusion and that it is often mistakenly used for any killing of a woman.
+
+
+
 # Setup
 
 ```{r setup, include=FALSE}
@@ -977,10 +982,7 @@ if (length(in_vocab) == 0) {
 
 ## Iterative query expansion
 
-We use the Word2Vec neighborhoods to suggest additional search terms that
-may reflect earlier or alternative framing. This does not replace manual
-review; it provides a ranked candidate list for curation and then a second
-API query.
+We use the word2vec neighborhoods to suggest additional search terms that may reflect earlier or alternative framing. It provides a ranked candidate list for curation which can then be added to a subsequent API query in an iterative proggress.
 
 ```{r query-expansion}
 # Split original keywords into action vs. relation/context (no new terms)
