@@ -104,6 +104,27 @@ simplified_patterns <- list(
   c("gewalt", "schutz")
 )
 
+# Normalize terms to match Word2Vec vocabulary (lowercase, optional umlaut, optional stemming)
+normalize_terms_for_model <- function(terms) {
+  norm <- stringr::str_to_lower(terms)
+  if (UMLAUT_MODE == "ae") {
+    norm <- stringr::str_replace_all(
+      norm,
+      c("\u00e4" = "ae", "\u00f6" = "oe", "\u00fc" = "ue", "\u00df" = "ss")
+    )
+  } else if (UMLAUT_MODE == "strip") {
+    norm <- stringr::str_replace_all(
+      norm,
+      c("\u00e4" = "a", "\u00f6" = "o", "\u00fc" = "u", "\u00df" = "ss")
+    )
+  }
+  toks <- quanteda::tokens(norm, remove_punct = TRUE)
+  if (USE_STEMMING) {
+    toks <- quanteda::tokens_wordstem(toks, language = "de")
+  }
+  vapply(toks, function(x) paste(x, collapse = "_"), character(1))
+}
+
 feminizid_keywords <- c(
   "Feminizid", "Femizid", "Frauenmord", "Femicide",
   "Familiendrama", "Familientrag\u00f6die", "Beziehungstat", "Ehestreit",
@@ -658,7 +679,13 @@ library(word2vec)
     # Opfer-Begriffe
     "frau", "ehefrau", "partnerin", "opf"
   )
-  
+
+  target_map <- data.frame(
+    original = target_words,
+    normalized = normalize_terms_for_model(target_words),
+    stringsAsFactors = FALSE
+  )
+
   cat("=== WORD2VEC DIACHRONE ANALYSE ===\n")
   cat("Time windows:", length(time_windows), "\n")
   cat("Target words:", length(target_words), "\n")
@@ -727,14 +754,15 @@ stopifnot(exists("feminizid_corpus"))
     
     word2vec_models[[window_name]] <- w2v_model
     
-    # Embeddings f\u00fcr Zielw\u00f6rter extrahieren
-    available_words <- intersect(target_words, rownames(as.matrix(w2v_model)))
+    # Embeddings for target words (normalized)
+    target_terms_model <- unique(target_map$normalized)
+    available_words <- intersect(target_terms_model, rownames(as.matrix(w2v_model)))
     if (length(available_words) > 0) {
       embeddings <- predict(w2v_model, available_words, type = "embedding")
       word2vec_embeddings[[window_name]] <- embeddings
-      cat("\u2713 Embeddings f\u00fcr", length(available_words), "Zielw\u00f6rter extrahiert\n")
+      cat("Embeddings extracted for", length(available_words), "targets\n")
     } else {
-      cat("WARN: Keine Zielw\u00f6rter in", window_name, "gefunden\n")
+      cat("WARN: No target words found in", window_name, "\n")
     }
   }
   
@@ -749,7 +777,9 @@ if (length(word2vec_models) >= 2) {
   # Frame-Shift-Analyse: Was ist in der N\u00e4he von was?
   frame_shift_results <- list()
   
-  for (target_word in target_words) {
+  for (i in seq_len(nrow(target_map))) {
+    target_word <- target_map$original[i]
+    target_norm <- target_map$normalized[i]
     
     # F\u00fcr jedes Zeitfenster die n\u00e4chsten Nachbarn finden
     neighbors_over_time <- list()
@@ -758,10 +788,10 @@ if (length(word2vec_models) >= 2) {
       model <- word2vec_models[[window_name]]
       
       # Pr\u00fcfen ob Wort im Modell vorhanden
-      if (target_word %in% rownames(as.matrix(model))) {
+      if (target_norm %in% rownames(as.matrix(model))) {
         
         # Top 10 \u00e4hnlichste W\u00f6rter finden
-        similar_words <- predict(model, target_word, type = "nearest", top_n = 10)
+        similar_words <- predict(model, target_norm, type = "nearest", top_n = 10)
         
         if (!is.null(similar_words) && length(similar_words) > 0) {
           neighbors_df <- data.frame(
@@ -905,7 +935,8 @@ if (exists("word2vec_models")) {
   export_projector <- function(model, out_dir, terms, top_n = 10) {
     if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
-    in_vocab <- intersect(terms, rownames(as.matrix(model)))
+    target_terms_model <- unique(target_map$normalized)
+    in_vocab <- intersect(target_terms_model, rownames(as.matrix(model)))
     if (length(in_vocab) == 0) {
       message("No terms found in model vocabulary.")
       return(invisible(NULL))
@@ -960,7 +991,8 @@ if (exists("word2vec_models")) {
     viz_window <- names(word2vec_models)[1]
     model <- word2vec_models[[viz_window]]
 
-    in_vocab <- intersect(target_words, rownames(as.matrix(model)))
+    target_terms_model <- unique(target_map$normalized)
+    in_vocab <- intersect(target_terms_model, rownames(as.matrix(model)))
     if (length(in_vocab) == 0) {
       message("No target words found in model vocabulary.")
     } else {
