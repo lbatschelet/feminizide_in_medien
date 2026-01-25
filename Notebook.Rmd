@@ -310,7 +310,7 @@ if (exists("media_data")) {
   
   # Nur relevante Keywords und Jahre
   keyword_timeline <- keyword_timeline %>%
-    filter(year >= 2000, year <= 2026) %>%
+    filter(year >= 2000, year <= 2025) %>%
     group_by(keyword) %>%
     filter(sum(keyword_articles) > 10) %>%  # Mindestens 10 Artikel insgesamt
     ungroup()
