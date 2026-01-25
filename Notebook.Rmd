@@ -56,7 +56,9 @@ feminizid_keywords <- c(
   "häusliche Gewalt", "Partnerschaftsgewalt", "Gewalt gegen Frauen",
   "Tötung von Frau", "Mord an Frau", "Partnergewalt", "Beziehungsgewalt"
 )
+```
 
+```{r execute-collection}
 # Vollständige Datenerhebung mit API-Wrapper
 collection_result <- execute_swissdox_workflow(
   client = client,
