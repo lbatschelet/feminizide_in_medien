@@ -74,6 +74,33 @@ load_checkpoint <- function(prefix, var_name) {
   TRUE
 ```
 
+```{r text-config}
+# Text analysis defaults
+SAVE_CORPUS <- FALSE
+USE_STEMMING <- TRUE
+UMLAUT_MODE <- "none"  # "none" | "ae" | "strip"
+
+# Multi-word patterns after stemming (used in preprocessing + word2vec)
+simplified_patterns <- list(
+  c("hauslich", "gewalt"),
+  c("partnerschaft", "gewalt"),
+  c("partner", "gewalt"),
+  c("bezieh", "gewalt"),
+  c("sexuell", "gewalt"),
+  c("k\u00f6rperl", "gewalt"),
+  c("psychisch", "gewalt"),
+  c("t\u00f6t", "frau"),
+  c("mord", "frau"),
+  c("gewalt", "frau"),
+  c("famili", "drama"),
+  c("famili", "trag\u00f6di"),
+  c("bezieh", "tat"),
+  c("eh", "streit"),
+  c("opf", "schutz"),
+  c("gewalt", "schutz")
+)
+```
+
 ## Data collection
 
 Build and run the Swissdox query. Use the checkpoint load block to resume
@@ -358,6 +385,19 @@ if (!exists("feminizid_corpus")) {
     str_remove_all("https?://\\S+") %>%
     str_squish()
 
+  # Optional umlaut normalization (affects stemming + word2vec)
+  if (UMLAUT_MODE == "ae") {
+    corpus_data$clean_content <- str_replace_all(
+      corpus_data$clean_content,
+      c("\u00e4" = "ae", "\u00f6" = "oe", "\u00fc" = "ue", "\u00df" = "ss")
+    )
+  } else if (UMLAUT_MODE == "strip") {
+    corpus_data$clean_content <- str_replace_all(
+      corpus_data$clean_content,
+      c("\u00e4" = "a", "\u00f6" = "o", "\u00fc" = "u", "\u00df" = "ss")
+    )
+  }
+
   corpus_data <- corpus_data %>%
     filter(!is.na(clean_content), clean_content != "", nchar(clean_content) > 50)
 
@@ -411,36 +451,14 @@ stopifnot(exists("feminizid_corpus"))
     tokens_tolower() %>%
     tokens_remove(all_stopwords, min_nchar = 3)
   
-  # ERST Stemming (reduziert alle Flexionsformen auf Grundform)
-  feminizid_tokens <- tokens_wordstem(feminizid_tokens, language = "de")
+  # Stemming (optional)
+  if (USE_STEMMING) {
+    feminizid_tokens <- tokens_wordstem(feminizid_tokens, language = "de")
+  }
   
   # DANN Multi-Word-Expressions (jetzt mit Grundformen)
   # Vereinfachte Patterns - nur Grundformen n\u00f6tig
-  simplified_patterns <- list(
-    # Gewalt-Begriffe (nur Grundformen nach Stemming)
-    c("hauslich", "gewalt"),      # h\u00e4usliche/h\u00e4uslicher \u2192 h\u00e4usl
-    c("partnerschaft", "gewalt"), 
-    c("partner", "gewalt"),
-    c("bezieh", "gewalt"),     # beziehungs \u2192 bezieh
-    c("sexuell", "gewalt"),    # sexuelle/sexueller \u2192 sexuell
-    c("k\u00f6rperl", "gewalt"),    # k\u00f6rperliche/k\u00f6rperlicher \u2192 k\u00f6rperl
-    c("psychisch", "gewalt"),
-    
-    # Feminizid-Begriffe
-    c("t\u00f6t", "frau"),          # t\u00f6tung \u2192 t\u00f6t
-    c("mord", "frau"),
-    c("gewalt", "frau"),
-    
-    # Familien-Begriffe
-    c("famili", "drama"),      # familien \u2192 famili
-    c("famili", "trag\u00f6di"),    # trag\u00f6die \u2192 trag\u00f6di
-    c("bezieh", "tat"),        # beziehungs \u2192 bezieh
-    c("eh", "streit"),         # ehe \u2192 eh
-    
-    # Justiz-Begriffe
-    c("opf", "schutz"),        # opfer \u2192 opf
-    c("gewalt", "schutz")
-  )
+  # Uses simplified_patterns defined in text-config
   
   # Multi-Word-Expressions zu Compound-Tokens zusammenfassen
   for (pattern in simplified_patterns) {
@@ -675,8 +693,11 @@ stopifnot(exists("feminizid_corpus"))
                            remove_numbers = TRUE,
                            remove_url = TRUE) %>%
       tokens_tolower() %>%
-      tokens_remove(all_stopwords, min_nchar = 3) %>%
-      tokens_wordstem(language = "de")
+      tokens_remove(all_stopwords, min_nchar = 3)
+
+    if (USE_STEMMING) {
+      window_tokens <- tokens_wordstem(window_tokens, language = "de")
+    }
     
     # Multi-Word-Expressions anwenden
     for (pattern in simplified_patterns) {
