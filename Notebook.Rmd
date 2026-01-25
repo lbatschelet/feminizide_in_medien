@@ -31,6 +31,14 @@ source("swissdox_api.R")
 # Datenerhebung: Feminizide und Familiendrama
 
 ```{r api-setup}
+# Environment-Variablen aus local.env laden
+if (file.exists("local.env")) {
+  load_dot_env("local.env")
+  message("✓ Environment-Variablen aus local.env geladen")
+} else {
+  message("⚠️ local.env nicht gefunden - verwende System-Environment")
+}
+
 # API Client mit Credentials initialisieren
 client <- SwissdoxAPI$new(
   api_key = Sys.getenv("SWISSDOX_API_KEY"),
