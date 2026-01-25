@@ -983,6 +983,18 @@ review; it provides a ranked candidate list for curation and then a second
 API query.
 
 ```{r query-expansion}
+# Split original keywords into action vs. relation/context (no new terms)
+action_terms <- c(
+  "Feminizid", "Femizid", "Frauenmord",
+  "Tötung von Frau", "Mord an Frau",
+  "Gewalt gegen Frauen", "Partnergewalt", "Beziehungsgewalt",
+  "häusliche Gewalt", "Partnerschaftsgewalt"
+)
+
+relation_terms <- c(
+  "Familiendrama", "Familientragödie", "Beziehungstat", "Ehestreit"
+)
+
 # Seeds in the model vocabulary (normalized form)
 seed_terms <- unique(target_map$normalized)
 
@@ -1146,18 +1158,6 @@ are split into two groups (action vs. relation) and combined with curated
 extra terms. Wildcards are included for single-word terms.
 
 ```{r second-pass-query}
-# Split original keywords into action vs. relation/context (no new terms)
-action_terms <- c(
-  "Feminizid", "Femizid", "Frauenmord",
-  "Tötung von Frau", "Mord an Frau",
-  "Gewalt gegen Frauen", "Partnergewalt", "Beziehungsgewalt",
-  "häusliche Gewalt", "Partnerschaftsgewalt"
-)
-
-relation_terms <- c(
-  "Familiendrama", "Familientragödie", "Beziehungstat", "Ehestreit"
-)
-
 # Wildcards only for single-word terms from the original list
 add_wildcards_single <- function(terms) {
   single <- terms[!grepl("\\s", terms)]
