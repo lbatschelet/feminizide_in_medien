@@ -89,3 +89,35 @@ Semantic Shift Detection (SSD): Researchers use computational models, particular
 https://www.uibk.ac.at/en/disc/blog/change-in-word-meaning/#:~:text=28.04.2022,their%20chosen%20words%20%5B1%5D.
 
 evtl. Google n-gram?
+
+---
+
+<!-- für uns -->
+
+## Integrating the bibliography in Quarto
+
+Pandoc supports bibliographies in a wide variety of formats including BibTeX and CSL. Add a bibliography to your document using the bibliography YAML metadata field. For example:
+
+```
+---
+title: "My Document"
+bibliography: library.bib
+link-citations: true
+---
+```
+
+See the Pandoc Citations documentation for additional information on bibliography formats.
+
+### In-text citation
+
+```
+Blah Blah [see @doe99, pp. 33-35; also @smith04, chap. 1].
+Blah Blah [@doe99, pp. 33-35, 38-39 and passim].
+Blah Blah [@smith04; @doe99].
+Smith says blah [-@smith04].
+
+@smith04 says blah.
+@smith04 [p. 33] says blah.
+```
+
+
