@@ -89,3 +89,6 @@ Semantic Shift Detection (SSD): Researchers use computational models, particular
 https://www.uibk.ac.at/en/disc/blog/change-in-word-meaning/#:~:text=28.04.2022,their%20chosen%20words%20%5B1%5D.
 
 evtl. Google n-gram?
+
+---
+
