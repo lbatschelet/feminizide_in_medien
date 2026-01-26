@@ -1,7 +1,16 @@
 ---
-title: "Feminicide in Media - Data Collection"
-output: html_notebook
-encoding: UTF-8
+title: "Feminicide in Media"
+date: 2026-01-26
+author:
+  -name: Lukas Batschelet
+   email: lukas.batschelet@students.unibe.ch
+  -name: Linus Kiener
+   email: linus.kiener@students.unibe.ch
+license: "CC-BY"
+format:
+  html
+execute:
+  cache: true
 ---
 
 ## Introduction
@@ -23,7 +32,47 @@ Based on this initial literature review, we have concluded that there is a subst
 [^3]: German: “\[d\]as BFS hingegen in der polizeilichen Kriminalstatistik (PKS) bei Gewaltstraftaten das Geschlecht der geschädigten Personen sowie die Beziehung zwischen geschädigten und beschuldigten Personen \[ausweist\], so dass Tötungsdelikte an Frauen in der Statistik sichtbar werden” <!-- evtl. italic? -->
 
 
-# Setup
+## Setup
+
+
+:::{.callout-warning}
+**Large files and long compute times ahead!**
+
+This pipeline relies on multithreaded processing wherever possible.
+
+Please make sure that **`quanteda` is running in parallel mode**.  
+If parallelisation is disabled, several steps (especially tokenisation and feature extraction) may take *extremely* long.
+
+:::{.callout-tip collapse=TRUE}
+**How to check whether `quanteda` runs in parallel**
+
+In R, run:
+
+```r
+library(quanteda)
+```
+
+If you see:
+
+```
+Parallel computing: disabled
+```
+
+then multithreading is **not** active and performance will be severely reduced.
+
+You can also inspect:
+
+```r
+quanteda_options()
+```
+
+For setup instructions and troubleshooting, see:
+[https://quanteda.io/articles/pkgdown/parallelisation.html](https://quanteda.io/articles/pkgdown/parallelisation.html)
+:::
+
+Swissdox API calls are also inherently slow and may take hours for large queries.
+:::
+
 
 ```{r setup, include=FALSE}
 library(httr)
@@ -74,17 +123,43 @@ client <- SwissdoxAPI$new(
 find_latest <- function(pattern, dir = "data") {
   files <- list.files(dir, pattern = pattern, full.names = TRUE)
   if (length(files) == 0) return(NULL)
-  files[order(file.mtime(files), decreasing = TRUE)][1]
+  # Prefer timestamp in filename (YYYYMMDD_HHMMSS). Fall back to mtime.
+  stamps <- stringr::str_match(basename(files), "(\\d{8}_\\d{6})")[, 2]
+  if (all(is.na(stamps))) {
+    return(files[order(file.mtime(files), decreasing = TRUE)][1])
+  }
+  ts <- suppressWarnings(as.POSIXct(stamps, format = "%Y%m%d_%H%M%S", tz = "UTC"))
+  files[order(ts, file.mtime(files), decreasing = TRUE)][1]
 }
 
 latest_checkpoint <- function(prefix, dir = "data") {
-  pattern <- paste0("^", prefix, "_\\d{8}_\\d{6}\\.rds$")
-  find_latest(pattern, dir)
+  patterns <- c(
+    paste0("^", prefix, "_\\d{8}_\\d{6}\\.rds$"),
+    paste0("^", prefix, "_\\d{8}_\\d{6}\\.qs2$")
+  )
+  files <- unlist(lapply(patterns, function(p) list.files(dir, pattern = p, full.names = TRUE)))
+  if (length(files) == 0) return(NULL)
+  # Reuse find_latest logic on the combined list
+  stamps <- stringr::str_match(basename(files), "(\\d{8}_\\d{6})")[, 2]
+  if (all(is.na(stamps))) {
+    return(files[order(file.mtime(files), decreasing = TRUE)][1])
+  }
+  ts <- suppressWarnings(as.POSIXct(stamps, format = "%Y%m%d_%H%M%S", tz = "UTC"))
+  files[order(ts, file.mtime(files), decreasing = TRUE)][1]
 }
 
-save_checkpoint <- function(obj, prefix, dir = "data", compress = "xz") {
-  file <- file.path(dir, paste0(prefix, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds"))
-  saveRDS(obj, file, compress = compress)
+save_checkpoint <- function(obj, prefix, dir = "data", format = "qs2", compress = "xz") {
+  timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
+  if (format == "qs2") {
+    if (!requireNamespace("qs2", quietly = TRUE)) {
+      stop("qs2 package not installed, cannot save .qs2 checkpoint")
+    }
+    file <- file.path(dir, paste0(prefix, "_", timestamp, ".qs2"))
+    qs2::qs_save(obj, file)
+  } else {
+    file <- file.path(dir, paste0(prefix, "_", timestamp, ".rds"))
+    saveRDS(obj, file, compress = compress)
+  }
   message("Saved checkpoint: ", basename(file))
   file
 }
@@ -95,7 +170,14 @@ load_checkpoint <- function(prefix, var_name) {
     message("No checkpoint found for: ", prefix)
     return(NULL)
   }
-  assign(var_name, readRDS(file), envir = .GlobalEnv)
+  if (grepl("\\.qs2$", file)) {
+    if (!requireNamespace("qs2", quietly = TRUE)) {
+      stop("qs2 package not installed, cannot read: ", basename(file))
+    }
+    assign(var_name, qs2::qs_read(file), envir = .GlobalEnv)
+  } else {
+    assign(var_name, readRDS(file), envir = .GlobalEnv)
+  }
   message("Loaded checkpoint: ", basename(file))
   file
 }
@@ -457,6 +539,8 @@ media_stopwords <- c("uhr", "jahr", "jahre", "jahren", "prozent", "franken", "ch
                     "november", "dezember", "schweiz", "schweizer", "schweizerin")
 
 all_stopwords <- c(german_stopwords, media_stopwords)
+all_stopwords <- unique(stringr::str_to_lower(all_stopwords))
+all_stopwords <- all_stopwords[nzchar(all_stopwords)]
 
 
 # Tokenisierung und Preprocessing
@@ -466,7 +550,7 @@ feminizid_tokens <- tokens(feminizid_corpus,
                           remove_numbers = TRUE,
                           remove_url = TRUE) %>%
   tokens_tolower() %>%
-  tokens_remove(all_stopwords, min_nchar = 3)
+  tokens_remove(all_stopwords, min_nchar = 3, valuetype = "fixed", padding = FALSE)
 
 # Stemming (optional)
 if (USE_STEMMING) {
@@ -695,8 +779,8 @@ build_w2v_text <- function(corpus_obj) {
                         remove_symbols = TRUE,
                         remove_numbers = TRUE,
                         remove_url = TRUE) %>%
-    tokens_tolower() %>%
-    tokens_remove(all_stopwords, min_nchar = 3)
+  tokens_tolower() %>%
+  tokens_remove(all_stopwords, min_nchar = 3, valuetype = "fixed", padding = FALSE)
   if (USE_STEMMING) {
     tokens_obj <- tokens_wordstem(tokens_obj, language = "de")
   }
@@ -717,12 +801,16 @@ train_w2v <- function(label, corpus_obj) {
     return(NULL)
   }
   cat("Training Word2Vec for", label, "(", n_docs, "docs,", length(txt), "texts)...\n")
-  word2vec(x = txt,
-            type = "skip-gram",
-            dim = 100,
-            iter = 20,
-            min_count = 5,
-            window = 5)
+  w2v_args <- list(
+    x = txt,
+    type = "skip-gram",
+    dim = 100,
+    iter = 20,
+    min_count = 5,
+    window = 5,
+    threads = max(1, parallel::detectCores() - 1)
+  )
+  do.call(word2vec::word2vec, w2v_args)
 }
 
 pb <- if (use_progress) progress::progress_bar$new(
@@ -1083,7 +1171,7 @@ tokens_raw <- tokens(corpus_for_map,
                      remove_numbers = TRUE,
                      remove_url = TRUE) %>%
   tokens_tolower() %>%
-  tokens_remove(all_stopwords, min_nchar = 3)
+  tokens_remove(all_stopwords, min_nchar = 3, valuetype = "fixed", padding = FALSE)
 
 tokens_stem <- tokens_wordstem(tokens_raw, language = "de")
 
@@ -1250,18 +1338,11 @@ second_pass_result <- execute_swissdox_workflow(
   return_data = TRUE,
   output_dir = "data"
 )
-```
 
-```{r second-pass-load-manual}
-# Manual fallback: load a downloaded TSV if the API call timed out
-manual_file <- "data/87abc702-4e8e-419c-8269-a81519a7ccff__2026_01_25T16_20_56.tsv.xz"
-media_data_second <- read_tsv(
-  manual_file,
-  locale = locale(encoding = "UTF-8"),
-  quote = "",
-  col_types = cols(.default = "c")
-)
-save_checkpoint(media_data_second, "feminizid_raw_data_secondpass")
+# Save second-pass result for reuse
+if (!is.null(second_pass_result$data)) {
+  save_checkpoint(second_pass_result$data, "feminizid_raw_data_secondpass")
+}
 ```
 
 ## Second-pass data preparation
@@ -1297,8 +1378,24 @@ secondpass_corpus <- corpus(
 save_checkpoint(secondpass_corpus, "feminizid_secondpass_corpus")
 ```
 
-```{r second-pass-article-counts}
-# Sanity check: article counts per year (1900-present)
+```{r second-pass-filter-rubrics}
+# Filter out broad international rubrics for a more focused second-pass set
+# (keeps the raw checkpoint intact; only affects downstream analysis)
+media_data_second <- media_data_second %>%
+  mutate(rubric_clean = stringr::str_to_lower(str_squish(rubric))) %>%
+  filter(!rubric_clean %in% c("ausland", "international")) %>%
+  select(-rubric_clean)
+
+secondpass_corpus <- corpus(
+  media_data_second,
+  text_field = "clean_content",
+  docid_field = "unique_id"
+)
+```
+
+
+```{r second-pass-analysis}
+# Basic distribution: article counts per year (1990-present)
 articles_second_by_year <- media_data_second %>%
   mutate(
     pubtime = as.POSIXct(as.character(pubtime), tz = "UTC"),
@@ -1307,75 +1404,55 @@ articles_second_by_year <- media_data_second %>%
   filter(!is.na(year), year >= 1990, year <= as.numeric(format(Sys.Date(), "%Y"))) %>%
   count(year)
 
-ggplot(articles_second_by_year, aes(x = year, y = n)) +
-  geom_col(fill = "steelblue", alpha = 0.8) +
-  theme_minimal() +
-  labs(title = "Second-pass articles per year",
-       x = "Year", y = "Article count")
-```
+cat("=== SECOND-PASS: ARTICLES PER YEAR ===\n")
+print(articles_second_by_year)
 
-## Language change over time
+# Top sources
+cat("\n=== SECOND-PASS: TOP MEDIA ===\n")
+top_media_second <- media_data_second %>%
+  count(medium_name, sort = TRUE) %>%
+  head(15)
+print(top_media_second)
 
-Two plots: (1) action vs. relation term usage over time, (2) key terms that
-distinguish early vs. late periods (1990-2004 vs. 2005+).
-
-```{r second-pass-language-change}
-wildcard_to_regex <- function(terms) {
-  escaped <- stringr::str_replace_all(terms, "([\\.^$|()\\[\\]{}+?\\\\])", "\\\\\\1")
-  stringr::str_replace_all(escaped, "\\*", ".*")
-}
-
-action_regex <- wildcard_to_regex(action_terms_second)
-relation_regex <- wildcard_to_regex(relation_terms_second)
-
-media_data_second <- media_data_second %>%
-  mutate(
-    has_action = str_detect(clean_content, regex(paste(action_regex, collapse = "|"), ignore_case = TRUE)),
-    has_relation = str_detect(clean_content, regex(paste(relation_regex, collapse = "|"), ignore_case = TRUE))
-  )
-
-usage_by_year <- media_data_second %>%
-  filter(!is.na(year)) %>%
-  group_by(year) %>%
-  summarise(
-    total_articles = n(),
-    action_articles = sum(has_action, na.rm = TRUE),
-    relation_articles = sum(has_relation, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  mutate(
-    action_per_1000 = (action_articles / total_articles) * 1000,
-    relation_per_1000 = (relation_articles / total_articles) * 1000
-  )
-
-usage_long <- usage_by_year %>%
-  select(year, action_per_1000, relation_per_1000) %>%
-  pivot_longer(-year, names_to = "category", values_to = "per_1000") %>%
-  mutate(category = recode(category,
-                           action_per_1000 = "Action terms",
-                           relation_per_1000 = "Relation terms"))
-
-p_lang1 <- ggplot(usage_long, aes(x = year, y = per_1000, color = category)) +
-  geom_line(size = 1, alpha = 0.8) +
-  theme_minimal() +
-  labs(title = "Action vs. relation terms over time (per 1000 articles)",
-       x = "Year", y = "Mentions per 1000 articles", color = "Category") +
-  theme(legend.position = "bottom")
+# Top rubric categories
+cat("\n=== SECOND-PASS: TOP RUBRICS ===\n")
+top_rubrics_second <- media_data_second %>%
+  mutate(rubric = na_if(str_squish(rubric), "")) %>%
+  count(rubric, sort = TRUE) %>%
+  head(15)
+print(top_rubrics_second)
 
 # Normalized contrast: early vs. late periods (per million words)
-tokens_raw <- tokens(secondpass_corpus,
-                     remove_punct = TRUE,
-                     remove_symbols = TRUE,
-                     remove_numbers = TRUE,
-                     remove_url = TRUE) %>%
-  tokens_tolower() %>%
-  tokens_remove(all_stopwords, min_nchar = 3)
+tokens_raw <- tokens(
+  secondpass_corpus,
+  remove_punct = TRUE,
+  remove_symbols = TRUE,
+  remove_numbers = TRUE,
+  remove_url = TRUE
+)
 
-dfm_raw <- dfm(tokens_raw)
-docvars(dfm_raw, "period") <- ifelse(docvars(secondpass_corpus, "year") < 2005,
-                                     "1990-2004", "2005-2026")
+dfm_raw <- dfm(tokens_raw, tolower = TRUE)
+dfm_raw <- dfm_remove(dfm_raw, all_stopwords, valuetype = "fixed")
+dfm_raw <- dfm_remove(
+  dfm_raw,
+  pattern = c(
+    "^uhr",
+    "^(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)$",
+    ".*\\d+.*",
+    "^[a-zäöüß]{1,2}$"
+  ),
+  valuetype = "regex",
+  case_insensitive = TRUE
+)
+dfm_raw <- dfm_trim(dfm_raw, min_termfreq = 10)
 
-dfm_period <- dfm_group(dfm_raw, groups = "period")
+doc_ids <- docnames(dfm_raw)
+year_lookup <- media_data_second$year[match(doc_ids, media_data_second$unique_id)]
+period_vec <- ifelse(is.na(year_lookup), "Unknown",
+                     ifelse(year_lookup < 2005, "1990-2004", "2005-2026"))
+docvars(dfm_raw, "period") <- period_vec
+
+dfm_period <- dfm_group(dfm_raw, groups = docvars(dfm_raw, "period"))
 dfm_prop <- dfm_weight(dfm_period, scheme = "prop")
 
 term_prop <- convert(dfm_prop, to = "data.frame") %>%
@@ -1399,13 +1476,98 @@ top_contrast <- bind_rows(
 ) %>%
   mutate(direction = ifelse(log2_ratio > 0, "Later period", "Earlier period"))
 
-p_lang2 <- ggplot(top_contrast, aes(x = reorder(term, log2_ratio), y = log2_ratio, fill = direction)) +
-  geom_col() +
-  coord_flip() +
-  theme_minimal() +
-  labs(title = "Key terms by period (log2 ratio, per million words)",
-       x = "Term", y = "Log2 ratio", fill = "Direction")
+cat("\n=== SECOND-PASS: KEY TERMS BY PERIOD (LOG2 RATIO) ===\n")
+print(top_contrast %>% select(term, log2_ratio, direction))
+```
 
-print(p_lang1)
-print(p_lang2)
+```{r checkpoint-save-secondpass-analysis}
+# Checkpoint save (Second-pass analysis outputs)
+save_checkpoint(top_contrast, "secondpass_key_terms")
+```
+
+## Second-pass semantic expansion (iteration 2)
+
+We run a second, focused embedding pass on the filtered second-pass corpus.
+The goal is to surface terms that describe feminicide framing across 5-year
+windows.
+
+```{r second-pass-word2vec-setup}
+library(word2vec)
+
+# Build 5-year windows based on available second-pass years
+min_year_sp <- min(media_data_second$year, na.rm = TRUE)
+max_year_sp <- max(media_data_second$year, na.rm = TRUE)
+window_starts <- seq(floor(min_year_sp / 5) * 5, max_year_sp, by = 5)
+time_windows_secondpass <- setNames(
+  lapply(window_starts, function(y) c(y, min(y + 4, max_year_sp))),
+  paste0(window_starts, "-", pmin(window_starts + 4, max_year_sp))
+)
+
+seed_terms_secondpass <- unique(target_map$normalized)
+```
+
+```{r second-pass-word2vec-training}
+# Train one model per window for the second-pass corpus
+word2vec_models_secondpass <- list()
+
+for (window_name in names(time_windows_secondpass)) {
+  window_years <- time_windows_secondpass[[window_name]]
+  window_corpus <- corpus_subset(
+    secondpass_corpus,
+    year >= window_years[1] & year <= window_years[2]
+  )
+  model <- train_w2v(window_name, window_corpus)
+  if (!is.null(model)) {
+    word2vec_models_secondpass[[window_name]] <- model
+  }
+}
+
+save_checkpoint(word2vec_models_secondpass, "word2vec_models_secondpass")
+```
+
+```{r checkpoint-load-word2vec-secondpass}
+# Checkpoint load (Second-pass Word2Vec)
+load_checkpoint("word2vec_models_secondpass", "word2vec_models_secondpass")
+```
+
+```{r second-pass-word2vec-neighbors}
+# Collect nearest neighbors for seed terms across windows
+collect_neighbors <- function(model, seeds, top_n = 30) {
+  seeds_in_vocab <- intersect(seeds, rownames(as.matrix(model)))
+  res <- lapply(seeds_in_vocab, function(seed) {
+    nn <- predict(model, seed, type = "nearest", top_n = top_n)[[1]]
+    data.frame(
+      seed = seed,
+      term = nn$term2,
+      similarity = nn$similarity,
+      rank = nn$rank,
+      stringsAsFactors = FALSE
+    )
+  })
+  dplyr::bind_rows(res)
+}
+
+neighbors_secondpass <- dplyr::bind_rows(lapply(names(word2vec_models_secondpass), function(w) {
+  model <- word2vec_models_secondpass[[w]]
+  df <- collect_neighbors(model, seed_terms_secondpass, top_n = 30)
+  df$window <- w
+  df
+}))
+
+save_checkpoint(neighbors_secondpass, "word2vec_neighbors_secondpass")
+
+candidate_terms_secondpass <- neighbors_secondpass %>%
+  group_by(term) %>%
+  summarise(
+    mean_similarity = mean(similarity),
+    seed_hits = n_distinct(seed),
+    window_hits = n_distinct(window),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(mean_similarity)) %>%
+  filter(seed_hits >= 2, window_hits >= 2) %>%
+  slice_head(n = 50)
+
+cat("\n=== SECOND-PASS: CANDIDATE TERMS (ITERATION 2) ===\n")
+print(candidate_terms_secondpass)
 ```
