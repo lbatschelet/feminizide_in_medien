@@ -103,3 +103,4 @@ data/
 *.csv.gz
 *.RData
 /.quarto/
+*.rmarkdown
