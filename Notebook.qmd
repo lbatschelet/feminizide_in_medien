@@ -5,10 +5,10 @@ abstract: |
   The language used in media reporting on the killing of women reflects and shapes broader social understandings of gender-based violence. This paper presents an exploratory analysis of discursive change in German-language Swiss media reporting on feminicides since 1990. Drawing on the Swissdox media archive, we apply diachronic word2vec models to examine how key terms and their semantic neighbourhoods have evolved over time. Rather than offering definitive causal explanations, the study aims to detect patterns of continuity and change in terminology, framing, and contextual associations. The findings indicate a gradual shift from individualising and relational framings toward more politicised and gender-specific vocabularies, while certain narrative conventions remain remarkably stable. By combining computational text analysis with a critical perspective on discourse, the paper highlights both the potential and the limits of word embedding methods for studying long-term transformations in media representations of feminicide.
 date: 2026-01-26
 author:
-  -name: Lukas Batschelet
-   email: lukas.batschelet@students.unibe.ch
-  -name: Linus Kiener
-   email: linus.kiener@students.unibe.ch
+  - name: Lukas Batschelet
+    email: lukas.batschelet@students.unibe.ch
+  - name: Linus Kiener
+    email: linus.kiener@students.unibe.ch
 license: "CC-BY-NC-SA"
 format:
   html
@@ -19,16 +19,8 @@ title-block-banner: true
 ---
 
 ## Introduction
-Media coverage of the topic of femicide has always been controversial. The term “femicide” itself is the subject of complex debate in the media and politics. For example, in its statement of August 12, 2020, on interpellation 20.3505[^1], the Federal Council said: “There are currently no plans to use the term ‘femicide’,” in response to the question of whether “\[it\] intends to promote the use of the term ‘femicide’ in diplomacy and in relations with the media”.[^2] However, it also points out that “\[t\]he FSO, on the other hand, \[reports\] the gender of the victims and the relationship between the victims and the accused in the police crime statistics (PKS) for violent crimes, so that homicides against women are visible in the statistics”.[^3] Information such as this can then be used by projects like [stopfemizid.ch](https://stopfemizid.ch) to crowdsource reports of such incidents. However, the debate surrounding the use of different terms has now progressed further, with the term “feminicide” gradually becoming established. (As we can also show in our subsequent analysis.) The term was coined by Mexican feminist activist Marcela Lagarde, who wanted to use the neologism “feminicidio” expanding the concept of “femicidio” to include, among other things, the dimension of institutional violence and responsibility [cf. @saccomano_femicide_2015, pp. 5; as seen in @ggf_femizid_2023]. However, @saccomano_femicide_2015 <!-- [p. 33] --> notes that the popularization of the term has also led to confusion and that it is often mistakenly used for any killing of a woman.  
 
-In its press release on case No. 20/2025, the Swiss Press Council also stated that “\[...\] it is in the public interest to report on femicides and draw attention to the issue” [@presserat_berichterstattung_2025]. Similar trends can also be observed in academic literature. An overview by @meltzer_gewalt_2023 summarizes extensive findings on media coverage in Germany and mentions “that the term ‘femicide’ did not play a major role in the media until 2019.” According to the report, it was only used in about 1% <!-- escape für % sollte nicht nötig sein --> of the articles examined. We will attempt to replicate this finding, among others, for Switzerland using data from Swissdox via the LiRI (Linguistic Research Infrastructure) API. Moreover, @wetzstein_femicide_2024 finds that, for posts from the entire DACH region during the observation period between 2018 and 2020, euphemistic terms such as “relationship drama” or “blood deed” vary significantly depending on the type of relationship between the victim and the perpetrator. These and other terms such as “family tragedies” or “jealousy dramas” “trivialize violence against women and turn femicides into fateful isolated cases” [@journalistde_kein_2023]. Apart from that, the use of terms such as “femicide” (which focus on the gender of the victim) is more common when the perpetrator's migrant background is mentioned in parallel [@wetzstein_femicide_2024; via @ustpat_studie_2024].  
-
-Based on this initial literature review, we have concluded that there is a substantial need for the availability and analysis of data related to the topic of femi(ni)cide, particularly in the recent past within the Swiss media landscape. Our work aims to construct a framework for obtaining relevant data and then demonstrates possible approaches and methods of analysis.
-
-<!-- *** -->
-<!-- redundant durch fussnoten separator -->
-
-<!-- Achtung: Quarto sollte gehen, aber R Markdown ist "lightweight markup" und unterstützt fussnoten nicht -->
+Media coverage of the topic of femicide has always been controversial. The term “femicide” itself is the subject of complex debate in the media and politics. For example, in its statement of August 12, 2020, on interpellation 20.3505[^1], the Federal Council said: “There are currently no plans to use the term ‘femicide’,” in response to the question of whether “\[it\] intends to promote the use of the term ‘femicide’ in diplomacy and in relations with the media”.[^2] However, it also points out that “\[t\]he FSO, on the other hand, \[reports\] the gender of the victims and the relationship between the victims and the accused in the police crime statistics (PKS) for violent crimes, so that homicides against women are visible in the statistics”.[^3] Information such as this can then be used by projects like [stopfemizid.ch](https://stopfemizid.ch) to crowdsource reports of such incidents. However, the debate surrounding the use of different terms has now progressed further, with the term “feminicide” gradually becoming established. (As we can also show in our subsequent analysis.) The term was coined by Mexican feminist activist Marcela Lagarde, who wanted to use the neologism “feminicidio” expanding the concept of “femicidio” to include, among other things, the dimension of institutional violence and responsibility [cf. @saccomano_femicide_2015, pp. 5; as seen in @ggf_femizid_2023]. However, @saccomano_femicide_2015 <!-- [p. 33] --> notes that the popularization of the term has also led to confusion and that it is often mistakenly used for any killing of a woman.
 
 [^1]: Swiss Federal Council, August 12, 2020, https://www.parlament.ch/de/ratsbetrieb/suche-curia-vista/geschaeft?AffairId=20203505 [via @carobbio_giscetti_interpellation_2020] <!-- evtl. heikel in Fussnote zu zitieren? -->
 
@@ -36,30 +28,38 @@ Based on this initial literature review, we have concluded that there is a subst
 
 [^3]: German: “\[d\]as BFS hingegen in der polizeilichen Kriminalstatistik (PKS) bei Gewaltstraftaten das Geschlecht der geschädigten Personen sowie die Beziehung zwischen geschädigten und beschuldigten Personen \[ausweist\], so dass Tötungsdelikte an Frauen in der Statistik sichtbar werden” <!-- evtl. italic? -->
 
+In its press release on case No. 20/2025, the Swiss Press Council also stated that “\[...\] it is in the public interest to report on femicides and draw attention to the issue” [@presserat_berichterstattung_2025]. Similar trends can also be observed in academic literature. An overview by @meltzer_gewalt_2023 summarizes extensive findings on media coverage in Germany and mentions “that the term ‘femicide’ did not play a major role in the media until 2019.” According to the report, it was only used in about 1% <!-- escape für % sollte nicht nötig sein --> of the articles examined. We will attempt to replicate this finding, among others, for Switzerland using data from Swissdox via the LiRI (Linguistic Research Infrastructure) API. Moreover, @wetzstein_femicide_2024 finds that, for posts from the entire DACH region during the observation period between 2018 and 2020, euphemistic terms such as “relationship drama” or “blood deed” vary significantly depending on the type of relationship between the victim and the perpetrator. These and other terms such as “family tragedies” or “jealousy dramas” “trivialize violence against women and turn femicides into fateful isolated cases” [@journalistde_kein_2023]. Apart from that, the use of terms such as “femicide” (which focus on the gender of the victim) is more common when the perpetrator's migrant background is mentioned in parallel [@wetzstein_femicide_2024; via @ustpat_studie_2024].
+
+Based on this initial literature review, we have concluded that there is a substantial need for the availability and analysis of data related to the topic of femi(ni)cide, particularly in the recent past within the Swiss media landscape. Our work aims to construct a framework for obtaining relevant data and then demonstrates possible approaches and methods of analysis.
+
+<!-- *** -->
+
+<!-- redundant durch fussnoten separator -->
+
+<!-- Achtung: Quarto sollte gehen, aber R Markdown ist "lightweight markup" und unterstützt fussnoten nicht -->
 
 ## Setup
 
-
-:::{.callout-warning}
+:::: callout-warning
 **Large files and long compute times ahead!**
 
 This pipeline relies on multithreaded processing wherever possible.
 
-Please make sure that **`quanteda` is running in parallel mode**.  
+Please make sure that **`quanteda` is running in parallel mode**.\
 If parallelisation is disabled, several steps (especially tokenisation and feature extraction) may take *extremely* long.
 
-:::{.callout-tip collapse=TRUE}
+::: {.callout-tip collapse="TRUE"}
 **How to check whether `quanteda` runs in parallel**
 
 In R, run:
 
-```r
+``` r
 library(quanteda)
 ```
 
 If you see:
 
-```
+```         
 Parallel computing: disabled
 ```
 
@@ -67,17 +67,15 @@ then multithreading is **not** active and performance will be severely reduced.
 
 You can also inspect:
 
-```r
+``` r
 quanteda_options()
 ```
 
-For setup instructions and troubleshooting, see:
-[https://quanteda.io/articles/pkgdown/parallelisation.html](https://quanteda.io/articles/pkgdown/parallelisation.html)
+For setup instructions and troubleshooting, see: <https://quanteda.io/articles/pkgdown/parallelisation.html>
 :::
 
 Swissdox API calls are also inherently slow and may take hours for large queries.
-:::
-
+::::
 
 ```{r setup, include=FALSE}
 library(httr)
@@ -124,6 +122,15 @@ client <- SwissdoxAPI$new(
   api_key = Sys.getenv("SWISSDOX_API_KEY"),
   api_secret = Sys.getenv("SWISSDOX_API_SECRET")
 )
+
+# Guard flags to prevent accidental duplicate API calls
+# Query guards:
+# - RUN_* enables the API call at all
+# - FORCE_* re-runs even if a checkpoint already exists
+RUN_FIRST_PASS_QUERY <- FALSE
+FORCE_FIRST_PASS_QUERY <- FALSE
+RUN_SECOND_PASS_QUERY <- FALSE
+FORCE_SECOND_PASS_QUERY <- FALSE
 # Checkpoint helpers (load/save latest timestamped files)
 find_latest <- function(pattern, dir = "data") {
   files <- list.files(dir, pattern = pattern, full.names = TRUE)
@@ -226,8 +233,7 @@ normalize_terms_for_model <- function(terms) {
 
 ## Keyword Definitions
 
-These terms are the basis for the queries. We define them centrally to keep
-usage consistent across analysis and API calls.
+These terms are the basis for the queries. We define them centrally to keep usage consistent across analysis and API calls.
 
 ```{r keyword-definitions}
 
@@ -242,8 +248,7 @@ feminizid_keywords <- c(
 
 ## Data collection
 
-Build and run the Swissdox query. Use the checkpoint load block to resume
-without re-running the API call.
+Build and run the Swissdox query. Use the checkpoint load block to resume without re-running the API call.
 
 We start with a broad exploratory query using the original keyword list (OR).
 
@@ -252,7 +257,12 @@ We start with a broad exploratory query using the original keyword list (OR).
 load_checkpoint("feminizid_raw_data", "media_data")
 ```
 
-```{r feminizid-data-collection}
+```{r feminizid-data-collection, cache=FALSE}
+# Skip if a checkpoint exists unless explicitly forced
+existing_firstpass <- latest_checkpoint("feminizid_raw_data")
+if (!RUN_FIRST_PASS_QUERY || (!FORCE_FIRST_PASS_QUERY && !is.null(existing_firstpass))) {
+  message("First-pass query skipped. Existing checkpoint: ", basename(existing_firstpass))
+} else {
 # Full data collection with API wrapper
 collection_result <- execute_swissdox_workflow(
   client = client,
@@ -281,12 +291,12 @@ if (!is.null(collection_result$data)) {
 } else {
   message("Error while loading data")
 }
+}
 ```
 
 ## Data preparation
 
-Load raw data (from checkpoint or TSV), clean fields, and prepare time
-variables used in analysis.
+Load raw data (from checkpoint or TSV), clean fields, and prepare time variables used in analysis.
 
 ```{r data-preparation}
 # Load data (checkpoint first, TSV fallback)
@@ -480,8 +490,7 @@ print(trend_summary)
 
 ## Corpus and preprocessing
 
-Build a quanteda corpus and a trimmed DFM from the cleaned articles. Use the
-checkpoint load block to resume without reprocessing.
+Build a quanteda corpus and a trimmed DFM from the cleaned articles. Use the checkpoint load block to resume without reprocessing.
 
 ```{r checkpoint-load-corpus}
 # Checkpoint load (corpus/dfm)
@@ -716,8 +725,7 @@ if (summary_stats$ratio_max_min > 5) {
 
 ## Word2Vec frame shift (diachronic)
 
-Train one Word2Vec model per time window and compare nearest neighbors
-across periods. Use the checkpoint load block to resume without retraining.
+Train one Word2Vec model per time window and compare nearest neighbors across periods. Use the checkpoint load block to resume without retraining.
 
 ```{r checkpoint-load-word2vec}
 # Checkpoint load (Word2Vec)
@@ -1013,20 +1021,11 @@ print(stability_summary)
 
 ## Local embedding visualization
 
-We reduce the 100-dimensional Word2Vec space to 3D with UMAP to inspect local
-semantic neighborhoods. UMAP builds a nearest-neighbor graph in the original
-space and optimizes a low-dimensional layout that preserves those local
-neighborhoods. The plotted axes are not interpretable dimensions; they are
-coordinates of a layout that preserves local structure.
+We reduce the 100-dimensional Word2Vec space to 3D with UMAP to inspect local semantic neighborhoods. UMAP builds a nearest-neighbor graph in the original space and optimizes a low-dimensional layout that preserves those local neighborhoods. The plotted axes are not interpretable dimensions; they are coordinates of a layout that preserves local structure.
 
-Interpretation:
-- Points close in 3D usually appear in similar contexts in the corpus.
-- Tight clusters suggest a coherent framing or shared discourse context.
-- Isolated points can indicate rare usage or distinct framing.
+Interpretation: - Points close in 3D usually appear in similar contexts in the corpus. - Tight clusters suggest a coherent framing or shared discourse context. - Isolated points can indicate rare usage or distinct framing.
 
-Caveats:
-- Distances are mainly meaningful locally (nearest neighbors).
-- Global positions and axis directions should not be over-interpreted.
+Caveats: - Distances are mainly meaningful locally (nearest neighbors). - Global positions and axis directions should not be over-interpreted.
 
 ```{r word2vec-local-embedding}
 set.seed(123)
@@ -1085,7 +1084,6 @@ if (length(in_vocab) == 0) {
   p_umap
 }
 ```
-
 
 ## Iterative query expansion
 
@@ -1262,11 +1260,9 @@ suggested_terms_final
 
 ## Second-pass API query (manual curation)
 
-We run a stricter AND query to keep results manageable. The original keywords
-are split into two groups (action vs. relation) and combined with curated
-extra terms. Wildcards are included for single-word terms.
+We run a stricter AND query to keep results manageable. The original keywords are split into two groups (action vs. relation) and combined with curated extra terms. Wildcards are included for single-word terms.
 
-```{r second-pass-query}
+```{r second-pass-query, cache=FALSE}
 # Wildcards only for single-word terms from the original list
 add_wildcards_single <- function(terms) {
   single <- terms[!grepl("\\s", terms)]
@@ -1322,31 +1318,36 @@ relation_terms_second <- normalize_wildcards(relation_terms_second)
 message("Second-pass action terms: ", paste(action_terms_second, collapse = ", "))
 message("Second-pass relation terms: ", paste(relation_terms_second, collapse = ", "))
 
-second_pass_result <- execute_swissdox_workflow(
-  client = client,
-  query = create_swissdox_query(
-    content_groups = list(
-      list(operator = "OR", terms = action_terms_second),
-      list(operator = "OR", terms = relation_terms_second)
+existing_secondpass <- latest_checkpoint("feminizid_raw_data_secondpass")
+if (!RUN_SECOND_PASS_QUERY || (!FORCE_SECOND_PASS_QUERY && !is.null(existing_secondpass))) {
+  message("Second-pass query skipped. Existing checkpoint: ", basename(existing_secondpass))
+} else {
+  second_pass_result <- execute_swissdox_workflow(
+    client = client,
+    query = create_swissdox_query(
+      content_groups = list(
+        list(operator = "OR", terms = action_terms_second),
+        list(operator = "OR", terms = relation_terms_second)
+      ),
+      date_from = "1990-01-01",
+      date_to = format(Sys.Date(), "%Y-%m-%d"),
+      languages = "de",
+      max_results = 1000000L,
+      columns = c("id", "pubtime", "medium_code", "medium_name", "rubric",
+                  "regional", "doctype", "doctype_description", "language",
+                  "char_count", "dateline", "head", "subhead",
+                  "article_link", "content_id", "content")
     ),
-    date_from = "1990-01-01",
-    date_to = format(Sys.Date(), "%Y-%m-%d"),
-    languages = "de",
-    max_results = 1000000L,
-    columns = c("id", "pubtime", "medium_code", "medium_name", "rubric",
-                "regional", "doctype", "doctype_description", "language", 
-                "char_count", "dateline", "head", "subhead", 
-                "article_link", "content_id", "content")
-  ),
-  name = paste("Feminizid_SecondPass", format(Sys.time(), "%Y%m%d_%H%M%S")),
-  comment = "Second-pass query with curated action+relation terms (1990+)",
-  return_data = TRUE,
-  output_dir = "data"
-)
+    name = paste("Feminizid_SecondPass", format(Sys.time(), "%Y%m%d_%H%M%S")),
+    comment = "Second-pass query with curated action+relation terms (1990+)",
+    return_data = TRUE,
+    output_dir = "data"
+  )
 
-# Save second-pass result for reuse
-if (!is.null(second_pass_result$data)) {
-  save_checkpoint(second_pass_result$data, "feminizid_raw_data_secondpass")
+  # Save second-pass result for reuse
+  if (!is.null(second_pass_result$data)) {
+    save_checkpoint(second_pass_result$data, "feminizid_raw_data_secondpass")
+  }
 }
 ```
 
@@ -1397,7 +1398,6 @@ secondpass_corpus <- corpus(
   docid_field = "unique_id"
 )
 ```
-
 
 ```{r second-pass-analysis}
 # Basic distribution: article counts per year (1990-present)
@@ -1492,9 +1492,7 @@ save_checkpoint(top_contrast, "secondpass_key_terms")
 
 ## Second-pass semantic expansion (iteration 2)
 
-We run a second, focused embedding pass on the filtered second-pass corpus.
-The goal is to surface terms that describe feminicide framing across 5-year
-windows.
+We run a second, focused embedding pass on the filtered second-pass corpus. The goal is to surface terms that describe feminicide framing across 5-year windows.
 
 ```{r second-pass-word2vec-setup}
 library(word2vec)
