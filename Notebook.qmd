@@ -1355,7 +1355,7 @@ if (!RUN_SECOND_PASS_QUERY || (!FORCE_SECOND_PASS_QUERY && !is.null(existing_sec
 
 Clean the second-pass data and build a corpus for downstream analysis.
 
-```{r second-pass-prep}
+```{r second-pass-prep, cache=FALSE}
 load_checkpoint("feminizid_raw_data_secondpass", "media_data_second")
 
 media_data_second$pubtime <- as.POSIXct(as.character(media_data_second$pubtime), tz = "UTC")
