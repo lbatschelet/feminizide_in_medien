@@ -96,7 +96,8 @@ local.env
 .env.local
 
 # Daten-Verzeichnis (heruntergeladene Datensätze)
-data/
+data/*
+!data/.gitkeep
 *.tsv
 *.tsv.xz
 *.csv
