@@ -51,15 +51,15 @@ If parallelisation is disabled, several steps (especially tokenisation and featu
 ::: {.callout-tip collapse="TRUE"}
 **How to check whether `quanteda` runs in parallel**
 
-In R, run:
+In R, run (quanteda is already loaded in the setup chunk):
 
 ``` r
-library(quanteda)
+quanteda_options()
 ```
 
 If you see:
 
-```         
+```
 Parallel computing: disabled
 ```
 
@@ -77,34 +77,33 @@ For setup instructions and troubleshooting, see: <https://quanteda.io/articles/p
 Swissdox API calls are also inherently slow and may take hours for large queries.
 ::::
 
-```{r setup, include=FALSE}
-library(httr)
-library(jsonlite)
-library(yaml)
-library(dotenv)
-library(R6)
-library(dplyr)
-library(ggplot2)
-library(stringr)
-library(tidytext)
-library(readr)
-library(tidyr)
-library(quanteda)
-library(quanteda.textplots)
-library(quanteda.textstats)
-library(tm)
-library(topicmodels)
-library(wordcloud)
-library(RColorBrewer)
-library(umap)
-library(plotly)
-library(hunspell)
+```{r setup, cache=FALSE}
+required_packages <- c(
+  "httr", "jsonlite", "yaml", "dotenv", "R6",
+  "dplyr", "ggplot2", "stringr", "tidytext", "readr", "tidyr",
+  "quanteda", "quanteda.textplots", "quanteda.textstats",
+  "tm", "topicmodels", "wordcloud", "RColorBrewer",
+  "umap", "plotly", "hunspell", "word2vec", "progress",
+  "qs2", "tibble", "scales"
+)
+
+missing_packages <- required_packages[
+  !vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)
+]
+if (length(missing_packages) > 0) {
+  install.packages(missing_packages)
+}
+
+invisible(lapply(required_packages, function(pkg) {
+  suppressPackageStartupMessages(library(pkg, character.only = TRUE))
+}))
 
 # API Wrapper laden
 source("swissdox_api.R")
 ```
 
 ## Document Setup
+
 
 Centralized API access, checkpoint utilities, and text configuration.
 
@@ -734,8 +733,6 @@ load_checkpoint("word2vec_frame_shifts", "all_frame_shifts")
 ```
 
 ```{r word2vec-setup}
-library(word2vec)
-
 # Time windows (5-year bins)
 time_windows <- list(
   "2000-2004" = c(2000, 2004),
@@ -938,9 +935,6 @@ if (length(window_models) >= 2) {
 ```{r word2vec-visualization}
 
 # Visualisierung 1: Heatmap der Frame-Shifts
-library(ggplot2)
-library(dplyr)
-
 # Top neighbors across all time windows
 top_shifts <- all_frame_shifts %>%
   filter(rank <= 5) %>%
@@ -1262,7 +1256,7 @@ suggested_terms_final
 
 We run a stricter AND query to keep results manageable. The original keywords are split into two groups (action vs. relation) and combined with curated extra terms. Wildcards are included for single-word terms.
 
-```{r second-pass-query, cache=FALSE}
+```{r second-pass-query,cache-lazy=FALSE}
 # Wildcards only for single-word terms from the original list
 add_wildcards_single <- function(terms) {
   single <- terms[!grepl("\\s", terms)]
@@ -1355,7 +1349,7 @@ if (!RUN_SECOND_PASS_QUERY || (!FORCE_SECOND_PASS_QUERY && !is.null(existing_sec
 
 Clean the second-pass data and build a corpus for downstream analysis.
 
-```{r second-pass-prep, cache=FALSE}
+```{r second-pass-prep,cache-lazy=FALSE}
 load_checkpoint("feminizid_raw_data_secondpass", "media_data_second")
 
 media_data_second$pubtime <- as.POSIXct(as.character(media_data_second$pubtime), tz = "UTC")
@@ -1384,7 +1378,7 @@ secondpass_corpus <- corpus(
 save_checkpoint(secondpass_corpus, "feminizid_secondpass_corpus")
 ```
 
-```{r second-pass-filter-rubrics}
+```{r second-pass-filter-rubrics,cache-lazy=FALSE}
 # Filter out broad international rubrics for a more focused second-pass set
 # (keeps the raw checkpoint intact; only affects downstream analysis)
 media_data_second <- media_data_second %>%
@@ -1399,7 +1393,7 @@ secondpass_corpus <- corpus(
 )
 ```
 
-```{r second-pass-analysis}
+```{r second-pass-analysis,cache-lazy=FALSE}
 # Basic distribution: article counts per year (1990-present)
 articles_second_by_year <- media_data_second %>%
   mutate(
@@ -1485,7 +1479,7 @@ cat("\n=== SECOND-PASS: KEY TERMS BY PERIOD (LOG2 RATIO) ===\n")
 print(top_contrast %>% select(term, log2_ratio, direction))
 ```
 
-```{r checkpoint-save-secondpass-analysis}
+```{r checkpoint-save-secondpass-analysis,cache-lazy=FALSE}
 # Checkpoint save (Second-pass analysis outputs)
 save_checkpoint(top_contrast, "secondpass_key_terms")
 ```
@@ -1494,9 +1488,7 @@ save_checkpoint(top_contrast, "secondpass_key_terms")
 
 We run a second, focused embedding pass on the filtered second-pass corpus. The goal is to surface terms that describe feminicide framing across 5-year windows.
 
-```{r second-pass-word2vec-setup}
-library(word2vec)
-
+```{r second-pass-word2vec-setup,cache-lazy=FALSE}
 # Build 5-year windows based on available second-pass years
 min_year_sp <- min(media_data_second$year, na.rm = TRUE)
 max_year_sp <- max(media_data_second$year, na.rm = TRUE)
@@ -1509,7 +1501,7 @@ time_windows_secondpass <- setNames(
 seed_terms_secondpass <- unique(target_map$normalized)
 ```
 
-```{r second-pass-word2vec-training}
+```{r second-pass-word2vec-training,cache-lazy=FALSE}
 # Train one model per window for the second-pass corpus
 word2vec_models_secondpass <- list()
 
@@ -1528,12 +1520,12 @@ for (window_name in names(time_windows_secondpass)) {
 save_checkpoint(word2vec_models_secondpass, "word2vec_models_secondpass")
 ```
 
-```{r checkpoint-load-word2vec-secondpass}
+```{r checkpoint-load-word2vec-secondpass,cache-lazy=FALSE}
 # Checkpoint load (Second-pass Word2Vec)
 load_checkpoint("word2vec_models_secondpass", "word2vec_models_secondpass")
 ```
 
-```{r second-pass-word2vec-neighbors}
+```{r second-pass-word2vec-neighbors,cache-lazy=FALSE}
 # Collect nearest neighbors for seed terms across windows
 collect_neighbors <- function(model, seeds, top_n = 30) {
   seeds_in_vocab <- intersect(seeds, rownames(as.matrix(model)))
