@@ -1256,7 +1256,7 @@ suggested_terms_final
 
 We run a stricter AND query to keep results manageable. The original keywords are split into two groups (action vs. relation) and combined with curated extra terms. Wildcards are included for single-word terms.
 
-```{r second-pass-query,cache-lazy=FALSE}
+```{r second-pass-query, cache.lazy=FALSE}
 # Wildcards only for single-word terms from the original list
 add_wildcards_single <- function(terms) {
   single <- terms[!grepl("\\s", terms)]
@@ -1349,7 +1349,7 @@ if (!RUN_SECOND_PASS_QUERY || (!FORCE_SECOND_PASS_QUERY && !is.null(existing_sec
 
 Clean the second-pass data and build a corpus for downstream analysis.
 
-```{r second-pass-prep,cache-lazy=FALSE}
+```{r second-pass-prep, cache.lazy=FALSE}
 load_checkpoint("feminizid_raw_data_secondpass", "media_data_second")
 
 media_data_second$pubtime <- as.POSIXct(as.character(media_data_second$pubtime), tz = "UTC")
@@ -1378,7 +1378,7 @@ secondpass_corpus <- corpus(
 save_checkpoint(secondpass_corpus, "feminizid_secondpass_corpus")
 ```
 
-```{r second-pass-filter-rubrics,cache-lazy=FALSE}
+```{r second-pass-filter-rubrics, cache.lazy=FALSE}
 # Filter out broad international rubrics for a more focused second-pass set
 # (keeps the raw checkpoint intact; only affects downstream analysis)
 media_data_second <- media_data_second %>%
@@ -1393,7 +1393,7 @@ secondpass_corpus <- corpus(
 )
 ```
 
-```{r second-pass-analysis,cache-lazy=FALSE}
+```{r second-pass-analysis, cache.lazy=FALSE}
 # Basic distribution: article counts per year (1990-present)
 articles_second_by_year <- media_data_second %>%
   mutate(
@@ -1479,7 +1479,7 @@ cat("\n=== SECOND-PASS: KEY TERMS BY PERIOD (LOG2 RATIO) ===\n")
 print(top_contrast %>% select(term, log2_ratio, direction))
 ```
 
-```{r checkpoint-save-secondpass-analysis,cache-lazy=FALSE}
+```{r checkpoint-save-secondpass-analysis, cache.lazy=FALSE}
 # Checkpoint save (Second-pass analysis outputs)
 save_checkpoint(top_contrast, "secondpass_key_terms")
 ```
@@ -1488,7 +1488,7 @@ save_checkpoint(top_contrast, "secondpass_key_terms")
 
 We run a second, focused embedding pass on the filtered second-pass corpus. The goal is to surface terms that describe feminicide framing across 5-year windows.
 
-```{r second-pass-word2vec-setup,cache-lazy=FALSE}
+```{r second-pass-word2vec-setup, cache.lazy=FALSE}
 # Build 5-year windows based on available second-pass years
 min_year_sp <- min(media_data_second$year, na.rm = TRUE)
 max_year_sp <- max(media_data_second$year, na.rm = TRUE)
@@ -1501,7 +1501,7 @@ time_windows_secondpass <- setNames(
 seed_terms_secondpass <- unique(target_map$normalized)
 ```
 
-```{r second-pass-word2vec-training,cache-lazy=FALSE}
+```{r second-pass-word2vec-training, cache.lazy=FALSE}
 # Train one model per window for the second-pass corpus
 word2vec_models_secondpass <- list()
 
@@ -1520,12 +1520,12 @@ for (window_name in names(time_windows_secondpass)) {
 save_checkpoint(word2vec_models_secondpass, "word2vec_models_secondpass")
 ```
 
-```{r checkpoint-load-word2vec-secondpass,cache-lazy=FALSE}
+```{r checkpoint-load-word2vec-secondpass, cache.lazy=FALSE}
 # Checkpoint load (Second-pass Word2Vec)
 load_checkpoint("word2vec_models_secondpass", "word2vec_models_secondpass")
 ```
 
-```{r second-pass-word2vec-neighbors,cache-lazy=FALSE}
+```{r second-pass-word2vec-neighbors, cache.lazy=FALSE}
 # Collect nearest neighbors for seed terms across windows
 collect_neighbors <- function(model, seeds, top_n = 30) {
   seeds_in_vocab <- intersect(seeds, rownames(as.matrix(model)))
