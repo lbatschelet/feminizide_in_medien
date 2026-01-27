@@ -11,7 +11,17 @@ author:
     email: linus.kiener@students.unibe.ch
 license: "CC-BY-NC-SA"
 format:
-  html
+  html:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    code_download: true
+    code_fold: true
+    code_tools: true
+    code_copy: true
+    code_line_numbers: true
+    code_line_numbers_width: 40
+    df-print: paged
 execute:
   cache: true
 bibliography: library.bib
@@ -48,8 +58,8 @@ This pipeline relies on multithreaded processing wherever possible.
 Please make sure that **`quanteda` is running in parallel mode**.\
 If parallelisation is disabled, several steps (especially tokenisation and feature extraction) may take *extremely* long.
 
-::: {.callout-tip collapse="TRUE"}
-**How to check whether `quanteda` runs in parallel**
+::: {.callout-tip collapse=true}
+## How to check whether `quanteda` runs in parallel
 
 In R, run (quanteda is already loaded in the setup chunk):
 
@@ -100,6 +110,7 @@ invisible(lapply(required_packages, function(pkg) {
 
 # API Wrapper laden
 source("swissdox_api.R")
+
 ```
 
 ## Document Setup
@@ -130,6 +141,12 @@ RUN_FIRST_PASS_QUERY <- FALSE
 FORCE_FIRST_PASS_QUERY <- FALSE
 RUN_SECOND_PASS_QUERY <- FALSE
 FORCE_SECOND_PASS_QUERY <- FALSE
+# Word2Vec guards (first-pass)
+RUN_WORD2VEC_TRAINING <- TRUE
+FORCE_WORD2VEC_TRAINING <- FALSE
+# Second-pass Word2Vec guards
+RUN_SECOND_PASS_W2V_TRAINING <- TRUE
+FORCE_SECOND_PASS_W2V_TRAINING <- FALSE
 # Checkpoint helpers (load/save latest timestamped files)
 find_latest <- function(pattern, dir = "data") {
   files <- list.files(dir, pattern = pattern, full.names = TRUE)
@@ -413,7 +430,7 @@ print(p4)
 
 # Print top keywords
 cat("\n=== KEYWORD FREQUENCY ===\n")
-print(keyword_counts)
+keyword_counts
 ```
 
 ```{r time-trends}
@@ -484,7 +501,7 @@ trend_summary <- keyword_timeline %>%
   ) %>%
   arrange(desc(total_articles))
 
-print(trend_summary)
+trend_summary
 ```
 
 ## Corpus and preprocessing
@@ -607,10 +624,13 @@ cat("Sparsity:", round(sparsity(feminizid_dfm_trimmed), 3), "\n")
 # Most frequent words
 if (nfeat(feminizid_dfm_trimmed) > 0) {
   top_features <- topfeatures(feminizid_dfm_trimmed, 25)
-  cat("\n=== MOST FREQUENT WORDS ===\n")
-  print(top_features)
+  top_features_df <- tibble::tibble(
+    term = names(top_features),
+    frequency = as.numeric(top_features)
+  )
+  top_features_df
 } else {
-  cat("\nWARN: No features after trimming - adjust parameters\n")
+  message("WARN: No features after trimming - adjust parameters")
 }
 ```
 
@@ -728,7 +748,7 @@ Train one Word2Vec model per time window and compare nearest neighbors across pe
 
 ```{r checkpoint-load-word2vec}
 # Checkpoint load (Word2Vec)
-load_checkpoint("word2vec_models", "word2vec_models")
+load_checkpoint("word2vec_vectors", "word2vec_vectors")
 load_checkpoint("word2vec_frame_shifts", "all_frame_shifts")
 ```
 
@@ -774,8 +794,17 @@ if (TRAIN_FULL_MODEL) {
 ```{r word2vec-training}
 
 # Train models for each window + optional full-period model
-word2vec_models <- list()
-word2vec_embeddings <- list()
+existing_vectors <- latest_checkpoint("word2vec_vectors")
+if (!RUN_WORD2VEC_TRAINING) {
+  message("Word2Vec training disabled (RUN_WORD2VEC_TRAINING = FALSE).")
+  if (!is.null(existing_vectors)) {
+    load_checkpoint("word2vec_vectors", "word2vec_vectors")
+  }
+} else if (!FORCE_WORD2VEC_TRAINING && !is.null(existing_vectors)) {
+  message("Word2Vec vectors already exist; skipping training.")
+  load_checkpoint("word2vec_vectors", "word2vec_vectors")
+} else {
+  word2vec_models <- list()
 
 # Optional progress bar (per window)
 use_progress <- requireNamespace("progress", quietly = TRUE)
@@ -830,104 +859,104 @@ pb <- if (use_progress) progress::progress_bar$new(
   width = 60
 ) else NULL
 
-for (window_name in names(time_windows)) {
-  if (use_progress) pb$tick()
-  window_years <- time_windows[[window_name]]
-  window_corpus <- corpus_subset(
-    feminizid_corpus,
-    year >= window_years[1] & year <= window_years[2]
-  )
-  model <- train_w2v(window_name, window_corpus)
-  if (is.null(model)) next
-  word2vec_models[[window_name]] <- model
-
-  target_terms_model <- unique(target_map$normalized)
-  available_words <- intersect(target_terms_model, rownames(as.matrix(model)))
-  if (length(available_words) > 0) {
-    word2vec_embeddings[[window_name]] <- predict(model, available_words, type = "embedding")
-  } else {
-    cat("WARN: No target words found in", window_name, "\n")
+  for (window_name in names(time_windows)) {
+    if (use_progress) pb$tick()
+    window_years <- time_windows[[window_name]]
+    window_corpus <- corpus_subset(
+      feminizid_corpus,
+      year >= window_years[1] & year <= window_years[2]
+    )
+    model <- train_w2v(window_name, window_corpus)
+    if (is.null(model)) next
+    word2vec_models[[window_name]] <- model
   }
-}
 
-if (TRAIN_FULL_MODEL) {
-  full_model <- train_w2v(FULL_MODEL_LABEL, feminizid_corpus)
-  if (!is.null(full_model)) {
-    word2vec_models[[FULL_MODEL_LABEL]] <- full_model
+  if (TRAIN_FULL_MODEL) {
+    full_model <- train_w2v(FULL_MODEL_LABEL, feminizid_corpus)
+    if (!is.null(full_model)) {
+      word2vec_models[[FULL_MODEL_LABEL]] <- full_model
+    }
   }
-}
 
-cat("\n=== TRAINING DONE ===\n")
-cat("Models:", length(word2vec_models), "\n")
-# Always save a checkpoint after training (expensive step)
-save_checkpoint(word2vec_models, "word2vec_models")
+  cat("\n=== TRAINING DONE ===\n")
+  cat("Models:", length(word2vec_models), "\n")
+
+  word2vec_vectors <- lapply(word2vec_models, as.matrix)
+  save_checkpoint(word2vec_vectors, "word2vec_vectors")
+}
 ```
 
 ```{r word2vec-frame-shift}
-window_models <- intersect(names(word2vec_models), names(time_windows))
+if (is.null(word2vec_vectors)) {
+  stop("No word2vec vectors available. Run the training chunk once.")
+}
+
+window_models <- intersect(names(word2vec_vectors), names(time_windows))
 if (length(window_models) >= 2) {
   
   # Frame-shift analysis: what is near what?
   frame_shift_results <- list()
+
+  normalize_vectors <- function(vectors) {
+    vectors <- as.matrix(vectors)
+    norms <- sqrt(rowSums(vectors^2))
+    norms[norms == 0] <- NA_real_
+    vectors / norms
+  }
+
+  vectors_norm_list <- lapply(word2vec_vectors[window_models], normalize_vectors)
   
+  nearest_terms <- function(vectors_norm, term, top_n = 10) {
+    if (!term %in% rownames(vectors_norm)) return(NULL)
+    sims <- as.numeric(vectors_norm %*% t(vectors_norm[term, , drop = FALSE]))
+    names(sims) <- rownames(vectors_norm)
+    sims <- sims[names(sims) != term]
+    top <- sort(sims, decreasing = TRUE)[seq_len(min(top_n, length(sims)))]
+    data.frame(
+      neighbor = names(top),
+      similarity = as.numeric(top),
+      rank = seq_along(top),
+      stringsAsFactors = FALSE
+    )
+  }
+
   for (i in seq_len(nrow(target_map))) {
     target_word <- target_map$original[i]
     target_norm <- target_map$normalized[i]
     
-    # Find nearest neighbors for each time window
     neighbors_over_time <- list()
     
     for (window_name in window_models) {
-      model <- word2vec_models[[window_name]]
-      
-      # Check whether term exists in model vocabulary
-      if (target_norm %in% rownames(as.matrix(model))) {
-        
-        # Find top 10 nearest words
-        similar_words <- predict(model, target_norm, type = "nearest", top_n = 10)
-        
-        if (!is.null(similar_words) && length(similar_words) > 0) {
-          neighbors_df <- data.frame(
-            period = window_name,
-            target = target_word,
-            neighbor = similar_words[[1]]$term2,
-            similarity = similar_words[[1]]$similarity,
-            rank = similar_words[[1]]$rank,
-            stringsAsFactors = FALSE
-          )
-          neighbors_over_time[[window_name]] <- neighbors_df
-        }
+      vectors_norm <- vectors_norm_list[[window_name]]
+      nn <- nearest_terms(vectors_norm, target_norm, top_n = 10)
+      if (!is.null(nn) && nrow(nn) > 0) {
+        neighbors_df <- nn %>%
+          mutate(period = window_name, target = target_word) %>%
+          select(period, target, neighbor, similarity, rank)
+        neighbors_over_time[[window_name]] <- neighbors_df
       }
     }
     
-    # Combine all time windows for this target term
     if (length(neighbors_over_time) > 0) {
       combined_neighbors <- do.call(rbind, neighbors_over_time)
       frame_shift_results[[target_word]] <- combined_neighbors
     }
   }
   
-  # Alle Ergebnisse kombinieren
   if (length(frame_shift_results) > 0) {
     all_frame_shifts <- do.call(rbind, frame_shift_results)
     save_checkpoint(all_frame_shifts, "word2vec_frame_shifts")
-    
-    cat("=== FRAME SHIFT ANALYSIS ===\n")
-    cat("Analyzed terms:", length(frame_shift_results), "\n")
-    cat("Total neighbor relations:", nrow(all_frame_shifts), "\n")
-    
-    # Top 3 neighbors per time window for all target terms
-    for (term in names(frame_shift_results)) {
-      cat("\n=== TARGET:", term, "===\n")
-      term_shifts <- frame_shift_results[[term]]
-      
-      top_neighbors <- term_shifts %>%
-        filter(rank <= 3) %>%
-        select(period, neighbor, similarity) %>%
-        arrange(period, -similarity)
-      
-      print(top_neighbors)
-    }
+
+    frame_shift_summary <- tibble::tibble(
+      analyzed_terms = length(frame_shift_results),
+      total_neighbor_relations = nrow(all_frame_shifts)
+    )
+    frame_shift_summary
+
+    top_neighbors_all <- all_frame_shifts %>%
+      filter(rank <= 3) %>%
+      arrange(target, period, rank)
+    top_neighbors_all
   }
 }
 ```
@@ -1010,7 +1039,7 @@ stability_summary <- stability_analysis %>%
   count(stability) %>%
   mutate(percentage = round(n / sum(n) * 100, 1))
 
-print(stability_summary)
+stability_summary
 ```
 
 ## Local embedding visualization
@@ -1024,33 +1053,47 @@ Caveats: - Distances are mainly meaningful locally (nearest neighbors). - Global
 ```{r word2vec-local-embedding}
 set.seed(123)
 
+if (is.null(word2vec_vectors)) {
+  stop("No word2vec vectors available. Run the training chunk once.")
+}
+
 # Prefer full-period model if available, otherwise latest window
-if (FULL_MODEL_LABEL %in% names(word2vec_models)) {
+if (FULL_MODEL_LABEL %in% names(word2vec_vectors)) {
   viz_window <- FULL_MODEL_LABEL
 } else {
-  available_windows <- intersect(names(word2vec_models), names(time_windows))
+  available_windows <- intersect(names(word2vec_vectors), names(time_windows))
   if (length(available_windows) > 0) {
     viz_window <- tail(available_windows, 1)
   } else {
-    viz_window <- tail(names(word2vec_models), 1)
+    viz_window <- tail(names(word2vec_vectors), 1)
   }
 }
 message("Using window: ", viz_window)
-model <- word2vec_models[[viz_window]]
+vectors <- word2vec_vectors[[viz_window]]
 
+normalize_vectors <- function(vectors) {
+  norms <- sqrt(rowSums(vectors^2))
+  norms[norms == 0] <- NA_real_
+  vectors / norms
+}
+
+vectors_norm <- normalize_vectors(vectors)
 target_terms_model <- unique(target_map$normalized)
-in_vocab <- intersect(target_terms_model, rownames(as.matrix(model)))
+in_vocab <- intersect(target_terms_model, rownames(vectors_norm))
 if (length(in_vocab) == 0) {
   message("No target words found in model vocabulary.")
 } else {
   neighbor_list <- lapply(in_vocab, function(term) {
-    nn <- predict(model, term, type = "nearest", top_n = 10)[[1]]$term2
+    sims <- as.numeric(vectors_norm %*% t(vectors_norm[term, , drop = FALSE]))
+    names(sims) <- rownames(vectors_norm)
+    sims <- sims[names(sims) != term]
+    nn <- names(sort(sims, decreasing = TRUE))[1:10]
     unique(c(term, nn))
   })
   vocab <- unique(unlist(neighbor_list))
 
-  vectors <- as.matrix(model)[vocab, , drop = FALSE]
-  umap_coords <- umap::umap(vectors, n_components = 3)$layout
+  vectors_sub <- vectors[vocab, , drop = FALSE]
+  umap_coords <- umap::umap(vectors_sub, n_components = 3)$layout
 
   embedding_df <- data.frame(
     term = vocab,
@@ -1099,24 +1142,37 @@ relation_terms <- c(
 # Seeds in the model vocabulary (normalized form)
 seed_terms <- unique(target_map$normalized)
 
-collect_neighbors <- function(model, seeds, top_n = 30) {
-  seeds_in_vocab <- intersect(seeds, rownames(as.matrix(model)))
+collect_neighbors_vectors <- function(vectors, seeds, top_n = 30) {
+  seeds_in_vocab <- intersect(seeds, rownames(vectors))
+  if (length(seeds_in_vocab) == 0) return(tibble())
+
+  norms <- sqrt(rowSums(vectors^2))
+  norms[norms == 0] <- NA_real_
+  vectors_norm <- vectors / norms
+
   res <- lapply(seeds_in_vocab, function(seed) {
-    nn <- predict(model, seed, type = "nearest", top_n = top_n)[[1]]
+    sims <- as.numeric(vectors_norm %*% t(vectors_norm[seed, , drop = FALSE]))
+    names(sims) <- rownames(vectors_norm)
+    sims <- sims[names(sims) != seed]
+    top <- sort(sims, decreasing = TRUE)[seq_len(min(top_n, length(sims)))]
     data.frame(
       seed = seed,
-      term = nn$term2,
-      similarity = nn$similarity,
-      rank = nn$rank,
+      term = names(top),
+      similarity = as.numeric(top),
+      rank = seq_along(top),
       stringsAsFactors = FALSE
     )
   })
   dplyr::bind_rows(res)
 }
 
-neighbors_all <- dplyr::bind_rows(lapply(names(word2vec_models), function(w) {
-  model <- word2vec_models[[w]]
-  df <- collect_neighbors(model, seed_terms, top_n = 30)
+if (is.null(word2vec_vectors)) {
+  stop("No word2vec vectors available. Run the training chunk once.")
+}
+
+neighbors_all <- dplyr::bind_rows(lapply(names(word2vec_vectors), function(w) {
+  vectors <- word2vec_vectors[[w]]
+  df <- collect_neighbors_vectors(vectors, seed_terms, top_n = 30)
   df$window <- w
   df
 }))
@@ -1403,23 +1459,23 @@ articles_second_by_year <- media_data_second %>%
   filter(!is.na(year), year >= 1990, year <= as.numeric(format(Sys.Date(), "%Y"))) %>%
   count(year)
 
-cat("=== SECOND-PASS: ARTICLES PER YEAR ===\n")
-print(articles_second_by_year)
+articles_second_by_year
+```
 
 # Top sources
-cat("\n=== SECOND-PASS: TOP MEDIA ===\n")
 top_media_second <- media_data_second %>%
   count(medium_name, sort = TRUE) %>%
   head(15)
-print(top_media_second)
+top_media_second
+```
 
 # Top rubric categories
-cat("\n=== SECOND-PASS: TOP RUBRICS ===\n")
 top_rubrics_second <- media_data_second %>%
   mutate(rubric = na_if(str_squish(rubric), "")) %>%
   count(rubric, sort = TRUE) %>%
   head(15)
-print(top_rubrics_second)
+top_rubrics_second
+```
 
 # Normalized contrast: early vs. late periods (per million words)
 tokens_raw <- tokens(
@@ -1475,8 +1531,7 @@ top_contrast <- bind_rows(
 ) %>%
   mutate(direction = ifelse(log2_ratio > 0, "Later period", "Earlier period"))
 
-cat("\n=== SECOND-PASS: KEY TERMS BY PERIOD (LOG2 RATIO) ===\n")
-print(top_contrast %>% select(term, log2_ratio, direction))
+top_contrast %>% select(term, log2_ratio, direction)
 ```
 
 ```{r checkpoint-save-secondpass-analysis, cache.lazy=FALSE}
@@ -1501,50 +1556,79 @@ time_windows_secondpass <- setNames(
 seed_terms_secondpass <- unique(target_map$normalized)
 ```
 
-```{r second-pass-word2vec-training, cache.lazy=FALSE}
-# Train one model per window for the second-pass corpus
-word2vec_models_secondpass <- list()
-
-for (window_name in names(time_windows_secondpass)) {
-  window_years <- time_windows_secondpass[[window_name]]
-  window_corpus <- corpus_subset(
-    secondpass_corpus,
-    year >= window_years[1] & year <= window_years[2]
-  )
-  model <- train_w2v(window_name, window_corpus)
-  if (!is.null(model)) {
-    word2vec_models_secondpass[[window_name]] <- model
+```{r second-pass-word2vec-training, cache=FALSE}
+# Train one model per window for the second-pass corpus.
+# Always export plain vectors (no external pointers) for reuse.
+existing_vectors <- latest_checkpoint("word2vec_vectors_secondpass")
+if (!RUN_SECOND_PASS_W2V_TRAINING) {
+  message("Second-pass Word2Vec training disabled (RUN_SECOND_PASS_W2V_TRAINING = FALSE).")
+  if (!is.null(existing_vectors)) {
+    load_checkpoint("word2vec_vectors_secondpass", "word2vec_vectors_secondpass")
   }
-}
+} else if (!FORCE_SECOND_PASS_W2V_TRAINING && !is.null(existing_vectors)) {
+  message("Second-pass Word2Vec vectors already exist; skipping training.")
+  load_checkpoint("word2vec_vectors_secondpass", "word2vec_vectors_secondpass")
+} else {
+  word2vec_models_secondpass <- list()
 
-save_checkpoint(word2vec_models_secondpass, "word2vec_models_secondpass")
+  for (window_name in names(time_windows_secondpass)) {
+    window_years <- time_windows_secondpass[[window_name]]
+    window_corpus <- corpus_subset(
+      secondpass_corpus,
+      year >= window_years[1] & year <= window_years[2]
+    )
+    model <- train_w2v(window_name, window_corpus)
+    if (!is.null(model)) {
+      word2vec_models_secondpass[[window_name]] <- model
+    }
+  }
+
+  word2vec_vectors_secondpass <- lapply(word2vec_models_secondpass, as.matrix)
+  save_checkpoint(word2vec_vectors_secondpass, "word2vec_vectors_secondpass")
+}
 ```
 
 ```{r checkpoint-load-word2vec-secondpass, cache.lazy=FALSE}
-# Checkpoint load (Second-pass Word2Vec)
-load_checkpoint("word2vec_models_secondpass", "word2vec_models_secondpass")
+# Checkpoint load (Second-pass Word2Vec vectors)
+load_checkpoint("word2vec_vectors_secondpass", "word2vec_vectors_secondpass")
 ```
 
 ```{r second-pass-word2vec-neighbors, cache.lazy=FALSE}
 # Collect nearest neighbors for seed terms across windows
-collect_neighbors <- function(model, seeds, top_n = 30) {
-  seeds_in_vocab <- intersect(seeds, rownames(as.matrix(model)))
+load_checkpoint("word2vec_vectors_secondpass", "word2vec_vectors_secondpass")
+
+collect_neighbors_vectors <- function(vectors, seeds, top_n = 30) {
+  seeds_in_vocab <- intersect(seeds, rownames(vectors))
+  if (length(seeds_in_vocab) == 0) return(tibble())
+
+  norms <- sqrt(rowSums(vectors^2))
+  norms[norms == 0] <- NA_real_
+  vectors_norm <- vectors / norms
+
   res <- lapply(seeds_in_vocab, function(seed) {
-    nn <- predict(model, seed, type = "nearest", top_n = top_n)[[1]]
+    seed_vec <- vectors_norm[seed, , drop = FALSE]
+    sims <- as.numeric(vectors_norm %*% t(seed_vec))
+    names(sims) <- rownames(vectors_norm)
+    sims <- sims[names(sims) != seed]
+    top <- sort(sims, decreasing = TRUE)[seq_len(min(top_n, length(sims)))]
     data.frame(
       seed = seed,
-      term = nn$term2,
-      similarity = nn$similarity,
-      rank = nn$rank,
+      term = names(top),
+      similarity = as.numeric(top),
+      rank = seq_along(top),
       stringsAsFactors = FALSE
     )
   })
   dplyr::bind_rows(res)
 }
 
-neighbors_secondpass <- dplyr::bind_rows(lapply(names(word2vec_models_secondpass), function(w) {
-  model <- word2vec_models_secondpass[[w]]
-  df <- collect_neighbors(model, seed_terms_secondpass, top_n = 30)
+if (is.null(word2vec_vectors_secondpass)) {
+  stop("No word2vec vectors available. Run the training chunk once.")
+}
+
+neighbors_secondpass <- dplyr::bind_rows(lapply(names(word2vec_vectors_secondpass), function(w) {
+  vectors <- word2vec_vectors_secondpass[[w]]
+  df <- collect_neighbors_vectors(vectors, seed_terms_secondpass, top_n = 30)
   df$window <- w
   df
 }))
@@ -1563,6 +1647,177 @@ candidate_terms_secondpass <- neighbors_secondpass %>%
   filter(seed_hits >= 2, window_hits >= 2) %>%
   slice_head(n = 50)
 
-cat("\n=== SECOND-PASS: CANDIDATE TERMS (ITERATION 2) ===\n")
-print(candidate_terms_secondpass)
+candidate_terms_secondpass
+```
+
+```{r second-pass-word2vec-3d, cache.lazy=FALSE}
+# Interactive 3D view across time windows (aligned spaces)
+# Important: align vectors across windows before comparing positions.
+if (is.null(word2vec_vectors_secondpass)) {
+  stop("No word2vec vectors available. Run the training chunk once.")
+}
+
+# Controls for density and focus
+TOP_NEIGHBORS_PER_TARGET <- 10
+MAX_MOVERS <- 30
+MAX_POINTS_PER_WINDOW <- 250
+MAX_TARGETS <- 6  # reduce for clarity; increase to show more targets
+
+# Select neighbors per target and window
+targets_focus <- head(seed_terms_secondpass, MAX_TARGETS)
+neighbors_top <- neighbors_secondpass %>%
+  filter(seed %in% targets_focus) %>%
+  group_by(window, seed) %>%
+  slice_max(order_by = similarity, n = TOP_NEIGHBORS_PER_TARGET, with_ties = FALSE) %>%
+  ungroup()
+
+# Dominant target per term/window (for coloring)
+dominant_seed <- neighbors_top %>%
+  group_by(window, term) %>%
+  slice_max(order_by = similarity, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  select(window, term, seed)
+
+# Build a compact term set: targets + top neighbors
+terms_all <- unique(c(targets_focus, neighbors_top$term))
+terms_all <- terms_all[!is.na(terms_all)]
+
+vectors_list <- word2vec_vectors_secondpass
+windows <- names(vectors_list)
+if (length(windows) < 2) {
+  stop("Need at least two time windows for an interactive timeline.")
+}
+
+# Reference window for alignment
+ref_window <- windows[1]
+ref_vectors <- vectors_list[[ref_window]]
+
+# Common terms used for alignment (must exist in all windows)
+common_terms <- Reduce(intersect, lapply(vectors_list, rownames))
+common_terms <- intersect(common_terms, rownames(ref_vectors))
+if (length(common_terms) < 50) {
+  message("WARN: Few common terms for alignment (", length(common_terms), ").")
+}
+
+align_to_reference <- function(vec, ref_vec, anchor_terms) {
+  anchors <- intersect(anchor_terms, rownames(vec))
+  anchors <- intersect(anchors, rownames(ref_vec))
+  if (length(anchors) < 10) return(vec)
+  A <- ref_vec[anchors, , drop = FALSE]
+  B <- vec[anchors, , drop = FALSE]
+  M <- t(B) %*% A
+  sv <- svd(M)
+  R <- sv$u %*% t(sv$v)
+  vec %*% R
+}
+
+# Align all windows to reference
+aligned_list <- lapply(vectors_list, function(v) {
+  align_to_reference(v, ref_vectors, common_terms)
+})
+
+# PCA basis from reference window on shared terms (for comparable axes)
+ref_anchor_terms <- intersect(terms_all, rownames(aligned_list[[ref_window]]))
+ref_anchor_terms <- intersect(ref_anchor_terms, common_terms)
+if (length(ref_anchor_terms) < 10) {
+  stop("Not enough shared terms for stable PCA alignment.")
+}
+ref_mat <- aligned_list[[ref_window]][ref_anchor_terms, , drop = FALSE]
+pca_ref <- prcomp(ref_mat, center = TRUE, scale. = FALSE)
+
+project_window <- function(vectors, terms, pca_obj) {
+  terms <- intersect(terms, rownames(vectors))
+  mat <- vectors[terms, , drop = FALSE]
+  coords <- scale(mat, center = pca_obj$center, scale = FALSE) %*% pca_obj$rotation[, 1:3]
+  data.frame(
+    term = terms,
+    x = coords[, 1],
+    y = coords[, 2],
+    z = coords[, 3],
+    stringsAsFactors = FALSE
+  )
+}
+
+plot_data <- dplyr::bind_rows(lapply(windows, function(w) {
+  vectors <- aligned_list[[w]]
+  df <- project_window(vectors, terms_all, pca_ref)
+  df$window <- w
+  df$type <- ifelse(df$term %in% seed_terms_secondpass, "target", "neighbor")
+  df
+}))
+
+# Track movers: terms with largest displacement across windows
+if (length(windows) >= 2) {
+  mover_candidates <- plot_data %>%
+    group_by(term) %>%
+    filter(n() == length(windows)) %>%
+    summarise(
+      dx = max(x) - min(x),
+      dy = max(y) - min(y),
+      dz = max(z) - min(z),
+      displacement = sqrt(dx^2 + dy^2 + dz^2),
+      .groups = "drop"
+    ) %>%
+    arrange(desc(displacement)) %>%
+    slice_head(n = MAX_MOVERS) %>%
+    pull(term)
+} else {
+  mover_candidates <- character(0)
+}
+
+plot_data <- plot_data %>%
+  left_join(dominant_seed, by = c("window", "term")) %>%
+  mutate(
+    is_mover = term %in% mover_candidates
+  )
+
+# Keep: all targets + top neighbors + movers
+plot_data <- plot_data %>%
+  filter(type == "target" | !is.na(seed) | is_mover)
+
+# Cap total points per window
+plot_data <- plot_data %>%
+  group_by(window) %>%
+  slice_head(n = MAX_POINTS_PER_WINDOW) %>%
+  ungroup()
+
+# Split targets vs neighbors for clearer rendering and stable traces
+targets_plot <- plot_data %>% filter(type == "target")
+neighbors_plot <- plot_data %>% filter(type == "neighbor")
+
+p_w2v_3d <- plotly::plot_ly() %>%
+  plotly::add_trace(
+    data = neighbors_plot,
+    x = ~x, y = ~y, z = ~z,
+    frame = ~window,
+    type = "scatter3d",
+    mode = "markers",
+    marker = list(size = 3, opacity = 0.5, color = "gray70"),
+    text = ~term,
+    hoverinfo = "text",
+    name = "Neighbors"
+  ) %>%
+  plotly::add_trace(
+    data = targets_plot,
+    x = ~x, y = ~y, z = ~z,
+    frame = ~window,
+    type = "scatter3d",
+    mode = "markers+text",
+    marker = list(size = 7, opacity = 0.95, color = "crimson"),
+    text = ~term,
+    textposition = "top center",
+    hoverinfo = "text",
+    name = "Targets"
+  ) %>%
+  plotly::layout(
+    title = "Word2Vec 3D timeline (aligned windows)",
+    scene = list(
+      xaxis = list(title = "PC1"),
+      yaxis = list(title = "PC2"),
+      zaxis = list(title = "PC3")
+    ),
+    legend = list(orientation = "h")
+  )
+
+p_w2v_3d
 ```
