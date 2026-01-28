@@ -1954,23 +1954,31 @@ p_w2v_3d <- plotly::plot_ly() %>%
 p_w2v_3d
 ```
 
-# Analysis
+# Analysis and discussion
 
-This final section consolidates the empirical findings and interprets them in relation to the research question. We summarize the evidence for discursive change and identify where the data supports or complicates the proposed narrative. The focus is on methodological transparency and cautious inference rather than strong causal claims. We also document limitations that readers should consider when interpreting the results. The goal is to provide a balanced, defensible account of the observed language shift.
+This section synthesizes the empirical findings and situates them in relation to the guiding research interest: how lethal violence against women is linguistically framed in German-language Swiss media over time, and how shifts in naming practices become visible—or remain invisible—within large-scale text data. The aim is not to establish causal explanations or definitive classifications, but to interpret observed patterns as indicators of changing discursive conditions under which violence becomes sayable, searchable, and countable.
 
-## Interpretation and limitations
+## Discursive shifts in naming gendered violence
 
-The descriptive trends and embedding neighborhoods suggest a gradual shift from euphemistic or relational framings toward more explicit naming of gendered violence. The final summary plot makes this especially visible: euphemistic terms decline over time, while explicitly politicized terms rise in the most recent years. This is consistent with a broader public discourse that increasingly recognizes feminicide as a distinct social problem. However, these are correlational indicators. Term usage is sensitive to genre, outlet, and event-driven spikes, and embeddings reflect co-occurrence patterns rather than causal mechanisms. We therefore treat the results as evidence of discursive change, not proof of underlying causes.
+Across descriptive frequency trends and distributional analyses, we observe a gradual but uneven reconfiguration of how lethal violence against women is named. Euphemistic or relational framings such as *Familiendrama*, *Familientragödie*, *Beziehungstat* or *Ehestreit* decline in relative prominence over time, while more explicit terms gain visibility in later periods.
 
-The limitations are substantial. Our approach is essentially a keyword-driven retrieval plus distributional analysis; we do not verify whether retrieved articles actually describe feminicides. That means precision is unknown, and false positives are likely. The second query still yields more than 1% of the entire Swissdox corpus and produces multi‑gigabyte files, which underscores how much topical “bycatch” remains even after refinement. We reduced some of this by removing the “international/ausland” rubrics, but this is a blunt filter that could also remove relevant coverage. Another limitation is that surface-form matching misses implicit framings, paraphrases, irony, and visual context. Stemming and normalization also collapse distinct uses into the same token, which can blur meaning.
+This shift, however, requires differentiation. *Frauenmord* is not a new or recently politicized term; it has long been present in German-language reporting and legal discourse. Its continued use therefore does not, in itself, indicate a feminist reframing. By contrast, *Femizid* appears with increasing frequency from the mid-2010s onward and is more clearly connected to international debates on gendered violence. *Feminizid*, which explicitly foregrounds structural power relations and patriarchal violence, remains marginal in German-Swiss media and has not (yet) become part of a broadly established journalistic vocabulary.
 
-There are also structural biases. Swissdox coverage varies by outlet and period; the corpus mix changes over time as media ecosystems shift. Metadata quality and duplication can introduce distortions, especially in long time series. Event-driven surges (e.g., high-profile cases or political debates) can produce spikes that are not representative of general discourse; in our case, the term “Hochseilartist” repeatedly appeared due to extensive coverage of the Freddy Nock case, which ended in an acquittal [@noauthor_toxische_2020]. Finally, embedding models are sensitive to hyperparameters and window choices; even with alignment, semantic neighborhoods are approximate and should be interpreted cautiously.
+Rather than a linear replacement of older terms by newer ones, the data points to a layered and heterogeneous discourse. Different framings coexist across outlets, genres, and temporal moments. Media discourse mobilizes multiple linguistic registers to narrate similar acts of violence, reflecting competing interpretive frameworks rather than a unified shift.
 
-Methodological extensions are therefore important. A next step would be a human-validated sample to estimate precision/recall and to validate whether the “feminicide” framing actually applies. Iterative term expansion could be combined with active learning or supervised classification to reduce false positives while keeping recall. Topic modeling or manual coding of a stratified sample could add interpretive depth and test whether euphemistic terms are used to downplay gendered violence. A focused victim–perpetrator framing analysis (who is foregrounded, how agency is assigned) would be especially valuable and is currently missing. Entity and relation extraction (victim–perpetrator ties, gender, and relationship descriptors) could also anchor the analysis in concrete event descriptions. These extensions would move the project from keyword-driven mapping toward a more comprehensive discourse analysis.
+The distributional analysis using distributional word embeddings trained with the Word2Vec algorithm supports this interpretation. Following the distributional hypothesis, these models capture patterns of co-occurrence rather than fixed meanings. Over time, *Femizid* increasingly appears in semantic neighborhoods associated with public debate, responsibility, and structural violence, whereas euphemistic terms remain embedded in contexts of interpersonal conflict, tragedy, or affective explanation. These shifts indicate changing contextual associations, not stable semantic redefinitions.
 
-To make the overall narrative more accessible, we end with a simplified time series that contrasts euphemistic framing against explicit naming. The expectation is that euphemistic terms decline relative to explicit terms if a feminist vocabulary becomes more established. This plot is not a causal test, but a compact summary of the descriptive evidence presented throughout the paper.
+Crucially, these findings should be read as discursive indicators. They speak to how violence is narrated and framed in media discourse, not to changes in the incidence, causes, or lived realities of violence itself.
 
-```{r framing-shift-summary}
+## Euphemistic versus explicit framing over time
+
+The contrast between euphemistic and explicit naming becomes particularly visible when aggregated into a simplified time series. @framing-shift-summary contrasts normalized frequencies of selected euphemistic framings with explicit naming practices per million words over time.
+
+While absolute frequencies fluctuate with overall media volume and event-driven attention, the relative trajectories suggest a declining reliance on euphemistic framings alongside a gradual increase in explicit naming.
+
+```{r}
+# | label: framing-shift-summary
+# | fig-cap: Euphemistic versus explicit framing over time (frequency per million words). The plot contrasts aggregated euphemistic framings (e.g. *Familiendrama*, *Beziehungstat*) with explicit naming (e.g. *Femizid*, *Feminizid*, *Frauenmord*).
 euphemistic_terms <- c("Familiendrama", "Familientragödie", "Beziehungstat", "Ehestreit")
 explicit_terms <- c("Femizid", "Feminizid", "Frauenmord")
 
@@ -2024,8 +2032,26 @@ p_framing_shift <- ggplot(group_counts, aes(x = year, y = freq_per_million, colo
   ) +
   theme(legend.position = "bottom")
 
-print(p_framing_shift)
+p_framing_shift
 ```
+
+## Visibility, absence, and epistemic limits
+
+While the observed trends point toward increased explicitness in some parts of media discourse, a central limitation of this analysis lies in what cannot be made visible through the data. The corpus consists exclusively of media reporting indexed in Swissdox. Acts of lethal violence against women that were not reported, were reported only marginally, or were linguistically attenuated beyond recognition remain structurally absent.
+
+From a feminist data perspective, this absence is not incidental. As argued by @dignazio_klein_data_feminism_2020, data infrastructures do not neutrally represent reality; they actively shape what becomes visible, legible, and countable. In the context of feminicide, the lack of official statistics and the reliance on activist counting practices underscore that visibility itself is politically contested. What enters the corpus is not feminicide as such, but media-recognized and linguistically articulated instances of violence.
+
+This has direct implications for interpretation. Killings framed without gender markers, relational descriptors, or recognizable violence terms may never enter the analytical space. In this sense, the corpus captures discursive recognition rather than empirical prevalence. The silences in the data are therefore analytically meaningful, even though they cannot be directly quantified.
+
+A further limitation concerns event-driven distortions. High-profile cases can dominate coverage and skew term distributions. In our dataset, repeated references to *Hochseilartist* trace back to extensive reporting on the Freddy-Nock case, which ultimately ended in an acquittal [@noauthor_toxische_2020]. Such cases illustrate how individual media events can introduce semantic noise that is unrelated to feminicide discourse as such.
+
+## Exploratory intent and methodological reflexivity
+
+It is therefore essential to emphasize the exploratory character of this project. We do not claim to have identified a definitive vocabulary, an exhaustive corpus, or a stable typology of framings. Especially in the first iteration, the central aim was term discovery: exploring how different ways of naming cluster, overlap, or remain isolated within the corpus.
+
+The use of Word2Vec embeddings was instrumental in this regard. By modeling distributional similarity rather than predefined categories, the method led us toward blind spots and unexpected associations that challenged the initial keyword set. Some suggested neighbors proved analytically productive; others revealed ambiguity, noise, or misleading overlaps. Both outcomes are valuable, as they expose the limits of intuition-driven keyword selection and foreground the interpretive work required in computational discourse analysis.
+
+We deliberately refrain from drawing strong or conclusive claims. Given the ethical and political stakes of researching gendered violence, epistemic modesty is warranted. The contribution of this study lies less in its substantive findings than in its process: demonstrating how computational methods can be used reflexively to explore discursive change, identify blind spots, and foreground the politics of visibility in large-scale text data. Rather than offering closure, the analysis opens further questions about how gendered violence is named, normalized, or silenced—and how such processes might be studied more rigorously in future work.
 
 # References {.unnumbered}
 
