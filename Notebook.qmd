@@ -3,7 +3,7 @@ title: "From “Family Tragedy” to “Feminicide”?"
 subtitle: "Exploring Discursive Change in Swiss Media Reporting on the Killing of Women since 1990"
 abstract: |
   The language used in media reporting on the killing of women reflects and shapes broader social understandings of gender-based violence. This paper presents an exploratory analysis of discursive change in German-language Swiss media reporting on feminicides since 1990. Drawing on the Swissdox media archive, we apply diachronic word2vec models to examine how key terms and their semantic neighbourhoods have evolved over time. Rather than offering definitive causal explanations, the study aims to detect patterns of continuity and change in terminology, framing, and contextual associations. The findings indicate a gradual shift from individualising and relational framings toward more politicised and gender-specific vocabularies, while certain narrative conventions remain remarkably stable. By combining computational text analysis with a critical perspective on discourse, the paper highlights both the potential and the limits of word embedding methods for studying long-term transformations in media representations of feminicide.
-date: 2026-01-26
+date: today
 author:
   - name: Lukas Batschelet
     email: lukas.batschelet@students.unibe.ch
