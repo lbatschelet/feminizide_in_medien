@@ -7,9 +7,17 @@ date: today
 author:
   - name: Lukas Batschelet
     email: lukas.batschelet@students.unibe.ch
+    affiliation:
+      - name: University of Bern
+        address: Bern, Switzerland
+        url: https://www.unibe.ch
   - name: Linus Kiener
     email: linus.kiener@students.unibe.ch
-license: "CC-BY-NC-SA"
+    affiliation:
+      - name: University of Bern
+        address: Bern, Switzerland
+        url: https://www.unibe.ch
+license: "CC BY-NC-SA"
 format:
   html:
     toc: true
@@ -1469,6 +1477,8 @@ The second iteration operationalizes the expanded vocabulary from iteration one.
 The second pass narrows the query by combining action terms with relation/context terms. This reduces false positives while still capturing relevant framing variants. We treat this pass as a curated subset rather than a full census.
 
 Methodologically, this step operationalizes a trade-off: we accept lower recall in exchange for higher precision. This is appropriate for the second iteration because we want a more focused corpus for semantic modeling. The AND combination ensures that both violence/action language and relational framing are present, which targets discourse patterns of interest. We explicitly document the term lists and exclusions to make the curation transparent. This also enables reproducibility and allows readers to critique or revise the operationalization.
+
+We set the start date to 1990 for two reasons. First, coverage and metadata quality improve markedly from the early to mid‑1990s, so earlier years are both sparse and less reliable. Second, restricting the window keeps computation feasible; extending further back would substantially increase runtime and storage without proportional analytical gain. The 1990 threshold therefore balances data availability with practical constraints.
 
 We run a stricter AND query to keep results manageable. The original keywords are split into two groups (action vs. relation) and combined with curated extra terms. Wildcards are included for single-word terms.
 
