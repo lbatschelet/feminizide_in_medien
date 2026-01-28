@@ -1976,9 +1976,9 @@ The contrast between euphemistic and explicit naming becomes particularly visibl
 
 While absolute frequencies fluctuate with overall media volume and event-driven attention, the relative trajectories suggest a declining reliance on euphemistic framings alongside a gradual increase in explicit naming.
 
-```{r framing-shift-summary}
-# | label: fig-framing-shift-summary
-# | fig-cap: Euphemistic versus explicit framing over time (frequency per million words). The plot contrasts aggregated euphemistic framings (e.g. *Familiendrama*, *Beziehungstat*) with explicit naming (e.g. *Femizid*, *Feminizid*, *Frauenmord*).
+```{r}
+#| label: fig-framing-shift-summary
+#| fig-cap: "Euphemistic versus explicit framing over time (frequency per million words). The plot contrasts aggregated euphemistic framings (e.g. *Familiendrama*, *Beziehungstat*) with explicit naming (e.g. *Femizid*, *Feminizid*, *Frauenmord*)."
 euphemistic_terms <- c("Familiendrama", "Familientragödie", "Beziehungstat", "Ehestreit")
 explicit_terms <- c("Femizid", "Feminizid", "Frauenmord")
 
