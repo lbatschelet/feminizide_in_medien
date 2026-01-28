@@ -9,7 +9,7 @@ author:
     email: lukas.batschelet@students.unibe.ch
   - name: Linus Kiener
     email: linus.kiener@students.unibe.ch
-license: "CC-BY-NC-SA"
+license: "CC BY-NC-SA"
 format:
   html:
     toc: true
