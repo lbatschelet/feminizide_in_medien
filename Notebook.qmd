@@ -22,7 +22,7 @@ format:
     code-line-numbers: true
     code-line-numbers-width: 40
     df-print: paged
-    reference-location: block
+    reference-location: section
     code-links: 
       - text: GitHub Repository
         icon: github
@@ -1059,6 +1059,8 @@ if (length(window_models) >= 2) {
 }
 ```
 
+These plots visualize which neighbors appear around each target term in different time windows. The heatmaps highlight continuity and change in contextual proximity, while the stability summary aggregates whether relations are stable or volatile across periods. This is meant as a descriptive lens on shifting discourse, not a definitive semantic map.
+
 ```{r word2vec-visualization}
 
 # Visualisierung 1: Heatmap der Frame-Shifts
@@ -1137,6 +1139,53 @@ stability_summary <- stability_analysis %>%
   mutate(percentage = round(n / sum(n) * 100, 1))
 
 stability_summary
+```
+
+We also provide an interactive “slideshow” view that lets readers step through targets and compare neighbor patterns over time in a consistent layout.
+
+```{r word2vec-visualization-slideshow}
+
+if (!is.null(all_frame_shifts) && nrow(all_frame_shifts) > 0) {
+  top_neighbors_all <- all_frame_shifts %>%
+    filter(rank <= 5)
+
+  top_neighbors_target <- top_neighbors_all %>%
+    group_by(target, neighbor) %>%
+    summarise(avg_similarity = mean(similarity), .groups = "drop") %>%
+    group_by(target) %>%
+    slice_max(avg_similarity, n = 10, with_ties = FALSE) %>%
+    ungroup()
+
+  slide_data <- top_neighbors_all %>%
+    inner_join(top_neighbors_target, by = c("target", "neighbor")) %>%
+    select(target, period, neighbor, similarity)
+
+  slide_data <- slide_data %>%
+    group_by(target) %>%
+    tidyr::complete(
+      period,
+      neighbor,
+      fill = list(similarity = 0)
+    ) %>%
+    ungroup()
+
+  p_slide <- plotly::plot_ly(
+    slide_data,
+    x = ~period,
+    y = ~neighbor,
+    z = ~similarity,
+    frame = ~target,
+    type = "heatmap",
+    colors = "Reds"
+  ) %>%
+    plotly::layout(
+      title = "Frame-shift slideshow by target",
+      xaxis = list(title = "Period"),
+      yaxis = list(title = "Neighbor")
+    )
+
+  p_slide
+}
 ```
 
 ## Embedding diagnostics
@@ -1961,7 +2010,13 @@ This final section consolidates the empirical findings and interprets them in re
 
 ## Interpretation and limitations
 
-The descriptive trends and embedding neighborhoods suggest a gradual shift from euphemistic/relational framings toward more explicit naming of gendered violence. This is consistent with a broader public discourse that increasingly recognizes feminicide as a distinct social problem. At the same time, these are correlational indicators: term usage is sensitive to genre, outlet, and event-driven spikes, and embeddings reflect co-occurrence patterns rather than causal mechanisms. We therefore treat the results as evidence of discursive change, not proof of underlying causes. A key limitation is that our operationalization focuses on surface forms and does not capture implicit framings or visual cues. Another limitation is that the Swissdox archive may under-represent certain outlets or time periods. Despite these constraints, the combination of frequency trends and neighborhood shifts provides a robust descriptive account of changing media language.
+The descriptive trends and embedding neighborhoods suggest a gradual shift from euphemistic or relational framings toward more explicit naming of gendered violence. The final summary plot makes this especially visible: euphemistic terms decline over time, while explicitly politicized terms rise in the most recent years. This is consistent with a broader public discourse that increasingly recognizes feminicide as a distinct social problem. However, these are correlational indicators. Term usage is sensitive to genre, outlet, and event-driven spikes, and embeddings reflect co-occurrence patterns rather than causal mechanisms. We therefore treat the results as evidence of discursive change, not proof of underlying causes.
+
+The limitations are substantial. Our approach is essentially a keyword-driven retrieval plus distributional analysis; we do not verify whether retrieved articles actually describe feminicides. That means precision is unknown, and false positives are likely. The second query still yields more than 1% of the entire Swissdox corpus and produces multi‑gigabyte files, which underscores how much topical “bycatch” remains even after refinement. We reduced some of this by removing the “international/ausland” rubrics, but this is a blunt filter that could also remove relevant coverage. Another limitation is that surface-form matching misses implicit framings, paraphrases, irony, and visual context. Stemming and normalization also collapse distinct uses into the same token, which can blur meaning.
+
+There are also structural biases. Swissdox coverage varies by outlet and period; the corpus mix changes over time as media ecosystems shift. Metadata quality and duplication can introduce distortions, especially in long time series. Event-driven surges (e.g., high-profile cases or political debates) can produce spikes that are not representative of general discourse; in our case, the term “Hochseilartist” repeatedly appeared due to extensive coverage of the Freddy Nock case, which ended in an acquittal [@noauthor_toxische_2020]. Finally, embedding models are sensitive to hyperparameters and window choices; even with alignment, semantic neighborhoods are approximate and should be interpreted cautiously.
+
+Methodological extensions are therefore important. A next step would be a human-validated sample to estimate precision/recall and to validate whether the “feminicide” framing actually applies. Iterative term expansion could be combined with active learning or supervised classification to reduce false positives while keeping recall. Topic modeling or manual coding of a stratified sample could add interpretive depth and test whether euphemistic terms are used to downplay gendered violence. A focused victim–perpetrator framing analysis (who is foregrounded, how agency is assigned) would be especially valuable and is currently missing. Entity and relation extraction (victim–perpetrator ties, gender, and relationship descriptors) could also anchor the analysis in concrete event descriptions. These extensions would move the project from keyword-driven mapping toward a more comprehensive discourse analysis.
 
 To make the overall narrative more accessible, we end with a simplified time series that contrasts euphemistic framing against explicit naming. The expectation is that euphemistic terms decline relative to explicit terms if a feminist vocabulary becomes more established. This plot is not a causal test, but a compact summary of the descriptive evidence presented throughout the paper.
 
@@ -2021,3 +2076,8 @@ p_framing_shift <- ggplot(group_counts, aes(x = year, y = freq_per_million, colo
 
 print(p_framing_shift)
 ```
+
+# References {.unnumbered}
+
+::: {#refs}
+:::
