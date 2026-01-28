@@ -9,6 +9,10 @@ author:
     email: lukas.batschelet@students.unibe.ch
   - name: Linus Kiener
     email: linus.kiener@students.unibe.ch
+affiliation:
+  - name: University of Bern
+    address: Bern, Switzerland
+    url: https://www.unibe.ch
 license: "CC BY-NC-SA"
 format:
   html:
