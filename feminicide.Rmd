@@ -24,15 +24,8 @@ format:
     df-print: paged
     reference-location: block
     code-links: 
-      - text: GitHub Repository
-        icon: github
-        href: https://github.com/lbatschelet/feminizide_in_medien
       - text: R Notebook
-        icon: file-code
-        href: feminicide.Rmd
-      - text: Swissdox API Wrapper
-        icon: file-code
-        href: swissdox_api.R
+        href: 
 execute:
   cache: true
 bibliography: library.bib
@@ -61,16 +54,12 @@ This paper asks whether Swiss media language has shifted from euphemistic or rel
 
 <!-- Achtung: Quarto sollte gehen, aber R Markdown ist "lightweight markup" und unterstützt fussnoten nicht -->
 
-# First iteration
+# Setup
 
-The first iteration is exploratory: we do not assume that we already know how feminicide was framed in earlier decades. We therefore start with a broad query and use word2vec to identify terms that appear in similar contexts to our initial seed list. This step helps surface historically plausible expressions that may not be captured by contemporary labels. The goal is not to finalize a vocabulary yet, but to map the semantic neighborhood around feminicide-related discourse. The resulting candidate terms become the basis for refining the second query. In short, iteration one is a discovery phase that expands the vocabulary and reduces present-day bias.
-
-## Setup
-
-This section initializes the environment, dependencies, and shared configuration used across all analyses. We load the packages that define the analytical toolbox (data handling, text processing, and visualization) so that later steps are reproducible. The emphasis is on making the computational environment explicit, because results in text analysis can depend on package versions and tokenization defaults. We also flag the computational cost early to set expectations about runtime. This is important because several blocks are intentionally heavy and should not be re-run accidentally. The setup therefore establishes a clear boundary between “infrastructure” and “analysis,” so later sections can focus on interpretation.
+This section initializes the environment, dependencies, and shared configuration used across all analyses. Heavy steps (API calls, embeddings) are guarded to avoid accidental re-runs.
 
 ::: {.callout-warning}
-### Large files and long compute times ahead!
+**Large files and long compute times ahead!**
 
 This pipeline relies on multithreaded processing wherever possible.
 
@@ -78,9 +67,7 @@ Please make sure that **`quanteda` is running in parallel mode**.\
 If parallelisation is disabled, several steps (especially tokenisation and feature extraction) may take *extremely* long.
 
 ::: {.callout-tip collapse=true}
-### How to check whether `quanteda` runs in parallel
-
-Because tokenization and DFM construction are the dominant cost drivers, parallelization has a large impact on total runtime. If multithreading is disabled, later blocks may take hours or fail due to time limits. We therefore make this check explicit and easy to repeat. It also increases reproducibility by ensuring that performance differences are not mistaken for methodological differences. In short, this is a practical prerequisite for running the pipeline reliably.
+## How to check whether `quanteda` runs in parallel
 
 In R, run (quanteda is already loaded in the setup chunk):
 
@@ -134,9 +121,10 @@ source("swissdox_api.R")
 
 ```
 
-## Configuration
+# Document Setup
 
-Centralized API access, checkpoint utilities, and text configuration. We define API credentials and guard flags here to prevent accidental re-fetching of large datasets. Checkpoint helpers standardize saving and loading of intermediate objects, which keeps the pipeline restartable and transparent. The same block also defines text-processing defaults (e.g., stemming and compound patterns) so that all later analyses rely on the same linguistic assumptions. This is crucial for comparability across time windows: we want observed shifts to reflect discourse change, not shifting preprocessing settings. By keeping configuration centralized, we can document methodological choices once and minimize hidden changes.
+
+Centralized API access, checkpoint utilities, and text configuration.
 
 ```{r document-setup}
 # Load environment variables from local.env
@@ -267,9 +255,9 @@ normalize_terms_for_model <- function(terms) {
 
 ```
 
-## Keyword definitions
+## Keyword Definitions
 
-These terms are the basis for the queries. We define them centrally to keep usage consistent across analysis and API calls. The list deliberately combines explicit feminicide terms with euphemistic or relational framings to capture competing discourse styles. This allows us to quantify whether explicit terms rise while euphemistic terms decline. By declaring the list here, we also make the operationalization transparent and open to critique. Later analyses use the same vocabulary so that shifts are interpretable as changes in usage rather than changes in definitions. This is a core methodological choice for the paper.
+These terms are the basis for the queries. We define them centrally to keep usage consistent across analysis and API calls.
 
 ```{r keyword-definitions}
 
@@ -282,9 +270,9 @@ feminizid_keywords <- c(
 
 ```
 
-## Data gathering
+# Data collection
 
-We retrieve relevant Swissdox articles with an initial broad keyword query. The goal is to maximize recall so that early analyses are not biased by overly restrictive filters. The API call is guarded by flags and checkpoints, so re-runs can reuse cached results without repeating the full download. This is important because the Swissdox API is slow and rate-limited, and large queries may take hours. We treat this first pass as an exploratory corpus that defines the overall landscape of discourse. It also provides the basis for later refinement into a second, more focused pass.
+We retrieve relevant Swissdox articles with an initial broad keyword query. The API call is guarded by flags and checkpoints, so re-runs can reuse cached results without repeating the full download.
 
 Build and run the Swissdox query. Use the checkpoint load block to resume without re-running the API call.
 
@@ -332,9 +320,9 @@ if (!is.null(collection_result$data)) {
 }
 ```
 
-## Cleaning and preparation
+## Data preparation
 
-We load raw documents, clean fields, and create time variables for later aggregation. The key steps are de-duplication, removal of empty content, and conversion of timestamps into consistent yearly and monthly variables. This is necessary because publication metadata varies across outlets and years. We also filter to German-language articles to keep the analysis linguistically coherent. All transformations are documented here to keep the analysis pipeline transparent. The result is a standardized dataset that can be used for both descriptive statistics and downstream embedding models.
+We load raw documents, clean fields, and create time variables for later aggregation. All transformations are documented here to keep the analysis pipeline transparent.
 
 Load raw data (from checkpoint or TSV), clean fields, and prepare time variables used in analysis.
 
@@ -378,11 +366,9 @@ message("Media outlets: ", length(unique(media_data$medium_name)))
 
 ```
 
-## Intermediary results
+## Descriptive results
 
 We first summarize coverage over time and identify the most frequent terms and sources. These descriptive statistics provide a baseline for interpreting later embedding results.
-
-At this stage we want to know whether the dataset behaves plausibly: are there enough documents per year, and do the most prominent outlets match expectations for Swiss media? These checks are not merely descriptive; they guard against systematic biases introduced by API filters or source coverage. We also look at headline keywords and their temporal patterns to establish whether the vocabulary shift we hypothesize is visible in simple counts. This helps anchor later embedding interpretations in observable frequency trends. In short, the intermediary results provide a sanity check and an empirical baseline.
 
 ```{r overview-analysis}
 
@@ -604,9 +590,9 @@ if (USE_SMOOTH) {
 print(p_terms_time)
 ```
 
-## Model preparation (corpus and DFM)
+## Corpus and preprocessing
 
-Build a quanteda corpus and a trimmed DFM from the cleaned articles. Use the checkpoint load block to resume without reprocessing. We create a linguistically consistent representation of the texts by removing boilerplate, normalizing case, and applying tailored stopword lists. This reduces noise from high-frequency function words and newsroom metadata. The document-feature matrix is the standard input for frequency analysis and embedding pipelines, so this step is foundational. Trimming parameters remove extremely rare and overly frequent terms to balance coverage with computational feasibility. These choices are methodological and therefore documented explicitly.
+Build a quanteda corpus and a trimmed DFM from the cleaned articles. Use the checkpoint load block to resume without reprocessing.
 
 ```{r checkpoint-load-corpus}
 # Checkpoint load (corpus/dfm)
@@ -844,11 +830,9 @@ if (summary_stats$ratio_max_min > 5) {
 
 ```
 
-## Model creation (Word2Vec, diachronic)
+# Word2Vec frame shift (diachronic)
 
 We train separate embeddings for five-year windows and compare nearest neighbors of key terms. This lets us observe shifts in semantic neighborhoods without implying causality.
-
-The diachronic setup is chosen because embeddings are not comparable across time without explicit alignment. By training separate windows, we respect the changing corpus composition and avoid conflating temporal effects. The neighbor comparisons are interpreted as shifts in context rather than stable “meanings.” This is a qualitative signal, not a deterministic metric. We also cache vectors to avoid repeated training, which is computationally expensive. The focus is therefore on reproducible, transparent exploratory analysis rather than performance optimization.
 
 Train one Word2Vec model per time window and compare nearest neighbors across periods. Use the checkpoint load block to resume without retraining.
 
@@ -1139,15 +1123,13 @@ stability_summary <- stability_analysis %>%
 stability_summary
 ```
 
-## Embedding diagnostics
+## Local embedding visualization
 
 We reduce the 100-dimensional Word2Vec space to 3D with UMAP to inspect local semantic neighborhoods. UMAP builds a nearest-neighbor graph in the original space and optimizes a low-dimensional layout that preserves those local neighborhoods. The plotted axes are not interpretable dimensions; they are coordinates of a layout that preserves local structure.
 
 Interpretation: - Points close in 3D usually appear in similar contexts in the corpus. - Tight clusters suggest a coherent framing or shared discourse context. - Isolated points can indicate rare usage or distinct framing.
 
 Caveats: - Distances are mainly meaningful locally (nearest neighbors). - Global positions and axis directions should not be over-interpreted.
-
-This diagnostic visualization is meant to communicate local structure, not to claim stable global geometry. It helps verify that target terms sit near plausible contextual neighbors and that the model is not dominated by artifacts. We therefore use it as a sanity check and a didactic tool for readers unfamiliar with embeddings. Any apparent “movement” here should be interpreted together with the more formal neighbor tables above. In short, the plot supports interpretation; it does not replace it.
 
 ```{r word2vec-local-embedding}
 set.seed(123)
@@ -1224,8 +1206,6 @@ if (length(in_vocab) == 0) {
 ## Iterative query expansion
 
 This section uses embedding neighborhoods to propose additional terms that might capture earlier or alternative framings. The candidates are heuristically filtered to reduce noise before being considered for a second-pass query.
-
-We treat this as a hypothesis-generation step: embeddings suggest related terms, but they still require human judgment and contextual validation. The filters (frequency thresholds, dictionary checks, and co-occurrence constraints) reduce noise and help avoid purely incidental neighbors. This step is important because it links computational exploration with manual curation, which is a typical workflow in discourse analysis. It also makes the second-pass query more precise by grounding it in observed usage rather than intuition alone. The resulting list should therefore be read as a curated shortlist, not a definitive taxonomy.
 
 We use the word2vec neighborhoods to suggest additional search terms that may reflect earlier or alternative framing. It provides a ranked candidate list for curation which can then be added to a subsequent API query in an iterative proggress.
 
@@ -1411,15 +1391,9 @@ suggested_terms_surface %>%
 suggested_terms_final
 ```
 
-# Second iteration
-
-The second iteration operationalizes the expanded vocabulary from iteration one. We run a new query using the enriched term list and then train word2vec models again on this larger, more targeted dataset. The analysis is grouped into five-year windows to make temporal change visible and comparable. This second pass is designed to reveal patterns of shifting usage and meaning, especially the contrast between euphemistic framings and explicit naming. The two-step design thus combines discovery (iteration one) with structured temporal analysis (iteration two). We interpret changes across windows as shifts in contextual association rather than stable semantic truths.
-
-## Data gathering (second-pass query)
+## Second-pass API query (manual curation)
 
 The second pass narrows the query by combining action terms with relation/context terms. This reduces false positives while still capturing relevant framing variants. We treat this pass as a curated subset rather than a full census.
-
-Methodologically, this step operationalizes a trade-off: we accept lower recall in exchange for higher precision. This is appropriate for the second iteration because we want a more focused corpus for semantic modeling. The AND combination ensures that both violence/action language and relational framing are present, which targets discourse patterns of interest. We explicitly document the term lists and exclusions to make the curation transparent. This also enables reproducibility and allows readers to critique or revise the operationalization.
 
 We run a stricter AND query to keep results manageable. The original keywords are split into two groups (action vs. relation) and combined with curated extra terms. Wildcards are included for single-word terms.
 
@@ -1512,11 +1486,9 @@ if (!RUN_SECOND_PASS_QUERY || (!FORCE_SECOND_PASS_QUERY && !is.null(existing_sec
 }
 ```
 
-## Cleaning and preparation (second-pass)
+## Second-pass data preparation
 
 We clean the second-pass data and build a focused corpus for downstream semantic analysis. The same cleaning logic is applied to keep results comparable with the first pass.
-
-This step mirrors the first iteration to ensure comparability. By applying the same filtering and metadata transformations, we reduce the risk that differences in results are artifacts of preprocessing. We also introduce a rubric-based filter to remove overly broad international categories, which helps focus the analysis on more relevant coverage. The output is a second-pass corpus that is smaller but more targeted, which is important for robust embedding comparisons. Consistency across iterations is a methodological requirement for interpreting change.
 
 Clean the second-pass data and build a corpus for downstream analysis.
 
@@ -1564,12 +1536,7 @@ secondpass_corpus <- corpus(
 )
 ```
 
-## Intermediary results (second-pass)
-
-We summarize the second-pass corpus to check coverage, dominant outlets, and rubric distribution. This ensures the curated query behaves as intended. These summaries serve two purposes. First, they verify that the curated query retrieves a plausible and stable subset of coverage across time. Second, they help interpret later semantic results by showing whether any single outlet or rubric dominates the corpus. We also compute a period contrast to identify terms that are disproportionately associated with later years, which connects directly to the framing-change hypothesis. In short, this section ensures the second-pass dataset is both methodologically sound and substantively interpretable.
-
 ```{r second-pass-analysis, cache.lazy=FALSE}
-# This block summarizes the curated second-pass corpus.
 # Basic distribution: article counts per year (1990-present)
 articles_second_by_year <- media_data_second %>%
   mutate(
@@ -1656,11 +1623,9 @@ top_contrast %>% select(term, log2_ratio, direction)
 save_checkpoint(top_contrast, "secondpass_key_terms")
 ```
 
-## Model creation (second-pass embeddings)
+## Second-pass semantic expansion (iteration 2)
 
 We repeat the embedding approach on the second-pass corpus to identify framing shifts inside this narrower, more specific dataset. This provides a robustness check against the broader first-pass collection.
-
-The second-pass embeddings are trained on a more curated corpus, which reduces noise and can sharpen semantic neighborhoods. Methodologically, this allows us to test whether the framing shifts observed in the first iteration persist when the dataset is more selective. We apply the same windowing strategy and caching logic to keep the comparison consistent. As before, we interpret neighbor changes as shifts in contextual association rather than stable meanings. This step therefore complements the first-pass embeddings and strengthens the overall argument.
 
 We run a second, focused embedding pass on the filtered second-pass corpus. The goal is to surface terms that describe feminicide framing across 5-year windows.
 
@@ -1713,10 +1678,6 @@ if (!RUN_SECOND_PASS_W2V_TRAINING) {
 # Checkpoint load (Second-pass Word2Vec vectors)
 load_checkpoint("word2vec_vectors_secondpass", "word2vec_vectors_secondpass")
 ```
-
-## Embedding diagnostics (second-pass)
-
-We compute nearest neighbors for the curated target list and then visualize semantic movement over time in an aligned 3D space. Alignment is essential because embedding spaces are only identifiable up to rotation. By aligning windows to a shared reference, we can compare relative positions across time without conflating rotation artifacts with semantic change. The visualization is therefore a guided exploration of how specific targets and their neighbors move over time. We keep the point cloud small and label targets to make the plot interpretable. The aim is to provide an intuitive companion to the neighbor tables and to support the narrative of framing change.
 
 ```{r second-pass-word2vec-neighbors, cache.lazy=FALSE}
 # Collect nearest neighbors for seed terms across windows
@@ -1955,69 +1916,6 @@ p_w2v_3d <- plotly::plot_ly() %>%
 p_w2v_3d
 ```
 
-# Analysis
-
-This final section consolidates the empirical findings and interprets them in relation to the research question. We summarize the evidence for discursive change and identify where the data supports or complicates the proposed narrative. The focus is on methodological transparency and cautious inference rather than strong causal claims. We also document limitations that readers should consider when interpreting the results. The goal is to provide a balanced, defensible account of the observed language shift.
-
 ## Interpretation and limitations
 
-The descriptive trends and embedding neighborhoods suggest a gradual shift from euphemistic/relational framings toward more explicit naming of gendered violence. This is consistent with a broader public discourse that increasingly recognizes feminicide as a distinct social problem. At the same time, these are correlational indicators: term usage is sensitive to genre, outlet, and event-driven spikes, and embeddings reflect co-occurrence patterns rather than causal mechanisms. We therefore treat the results as evidence of discursive change, not proof of underlying causes. A key limitation is that our operationalization focuses on surface forms and does not capture implicit framings or visual cues. Another limitation is that the Swissdox archive may under-represent certain outlets or time periods. Despite these constraints, the combination of frequency trends and neighborhood shifts provides a robust descriptive account of changing media language.
-
-To make the overall narrative more accessible, we end with a simplified time series that contrasts euphemistic framing against explicit naming. The expectation is that euphemistic terms decline relative to explicit terms if a feminist vocabulary becomes more established. This plot is not a causal test, but a compact summary of the descriptive evidence presented throughout the paper.
-
-```{r framing-shift-summary}
-euphemistic_terms <- c("Familiendrama", "Familientragödie", "Beziehungstat", "Ehestreit")
-explicit_terms <- c("Femizid", "Feminizid", "Frauenmord")
-
-media_terms <- media_data %>%
-  filter(!is.na(content), content != "") %>%
-  mutate(
-    year = as.numeric(year),
-    content_lower = stringr::str_to_lower(content),
-    word_count = stringr::str_count(content_lower, "\\S+")
-  ) %>%
-  filter(!is.na(year), year >= 2000, year <= 2025)
-
-total_words_year <- media_terms %>%
-  group_by(year) %>%
-  summarise(total_words = sum(word_count), .groups = "drop")
-
-make_term_regex <- function(term) {
-  term <- stringr::str_to_lower(term)
-  parts <- strsplit(term, "\\s+")[[1]]
-  paste0("\\b", paste(parts, collapse = "\\s+"), "\\b")
-}
-
-count_terms <- function(terms, label) {
-  counts <- dplyr::bind_rows(lapply(terms, function(term) {
-    pattern <- make_term_regex(term)
-    media_terms %>%
-      mutate(count = stringr::str_count(content_lower, pattern)) %>%
-      group_by(year) %>%
-      summarise(count = sum(count), .groups = "drop")
-  }))
-  counts %>%
-    group_by(year) %>%
-    summarise(count = sum(count), .groups = "drop") %>%
-    mutate(group = label)
-}
-
-group_counts <- bind_rows(
-  count_terms(euphemistic_terms, "Euphemistic framing"),
-  count_terms(explicit_terms, "Explicit naming")
-) %>%
-  left_join(total_words_year, by = "year") %>%
-  mutate(freq_per_million = (count / total_words) * 1e6)
-
-p_framing_shift <- ggplot(group_counts, aes(x = year, y = freq_per_million, color = group)) +
-  geom_line(linewidth = 1.1, alpha = 0.9) +
-  theme_minimal() +
-  labs(
-    title = "Euphemistic vs explicit framing over time",
-    subtitle = "Frequency per million words",
-    x = "Year", y = "Frequency per million words", color = NULL
-  ) +
-  theme(legend.position = "bottom")
-
-print(p_framing_shift)
-```
+The descriptive trends and embedding neighborhoods suggest a gradual shift from euphemistic/relational framings toward more explicit naming of gendered violence. This is consistent with a broader public discourse that increasingly recognizes feminicide as a distinct social problem. At the same time, these are correlational indicators: term usage is sensitive to genre, outlet, and event-driven spikes, and embeddings reflect co-occurrence patterns rather than causal mechanisms. We therefore treat the results as evidence of discursive change, not proof of underlying causes.
