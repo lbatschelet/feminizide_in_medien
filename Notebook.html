@@ -2576,12 +2576,12 @@ If parallelisation is disabled, several steps (especially tokenisation and featu
 </section>
 <section id="euphemistic-versus-explicit-framing-over-time" class="level2" data-number="4.2">
 <h2 data-number="4.2" class="anchored" data-anchor-id="euphemistic-versus-explicit-framing-over-time"><span class="header-section-number">4.2</span> Euphemistic versus explicit framing over time</h2>
-<p>The contrast between euphemistic and explicit naming becomes particularly visible when aggregated into a simplified time series. <span class="citation" data-cites="framing-shift-summary">(<a href="#ref-framing-shift-summary" role="doc-biblioref"><strong>framing-shift-summary?</strong></a>)</span> contrasts normalized frequencies of selected euphemistic framings with explicit naming practices per million words over time.</p>
+<p>The contrast between euphemistic and explicit naming becomes particularly visible when aggregated into a simplified time series. <strong>?@fig-framing-shift-summary</strong> contrasts normalized frequencies of selected euphemistic framings with explicit naming practices per million words over time.</p>
 <p>While absolute frequencies fluctuate with overall media volume and event-driven attention, the relative trajectories suggest a declining reliance on euphemistic framings alongside a gradual increase in explicit naming.</p>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb96"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb96-1"><a href="#cb96-1" aria-hidden="true" tabindex="-1"></a><span class="co"># | label: framing-shift-summary</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb96"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb96-1"><a href="#cb96-1" aria-hidden="true" tabindex="-1"></a><span class="co"># | label: fig-framing-shift-summary</span></span>
 <span id="cb96-2"><a href="#cb96-2" aria-hidden="true" tabindex="-1"></a><span class="co"># | fig-cap: Euphemistic versus explicit framing over time (frequency per million words). The plot contrasts aggregated euphemistic framings (e.g. *Familiendrama*, *Beziehungstat*) with explicit naming (e.g. *Femizid*, *Feminizid*, *Frauenmord*).</span></span>
 <span id="cb96-3"><a href="#cb96-3" aria-hidden="true" tabindex="-1"></a>euphemistic_terms <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Familiendrama"</span>, <span class="st">"Familientragödie"</span>, <span class="st">"Beziehungstat"</span>, <span class="st">"Ehestreit"</span>)</span>
 <span id="cb96-4"><a href="#cb96-4" aria-hidden="true" tabindex="-1"></a>explicit_terms <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Femizid"</span>, <span class="st">"Feminizid"</span>, <span class="st">"Frauenmord"</span>)</span>
@@ -2641,7 +2641,7 @@ If parallelisation is disabled, several steps (especially tokenisation and featu
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="Notebook_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="Notebook_files/figure-html/framing-shift-summary-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -5126,92 +5126,91 @@ Wetzstein, Irmgard, Yvonne Prinzellner, and Elisabeth Kröpfl. 2024. <span>“Fe
 <span id="cb97-1972"><a href="#cb97-1972" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb97-1973"><a href="#cb97-1973" aria-hidden="true" tabindex="-1"></a><span class="fu">## Euphemistic versus explicit framing over time</span></span>
 <span id="cb97-1974"><a href="#cb97-1974" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-1975"><a href="#cb97-1975" aria-hidden="true" tabindex="-1"></a>The contrast between euphemistic and explicit naming becomes particularly visible when aggregated into a simplified time series. @framing-shift-summary contrasts normalized frequencies of selected euphemistic framings with explicit naming practices per million words over time.</span>
+<span id="cb97-1975"><a href="#cb97-1975" aria-hidden="true" tabindex="-1"></a>The contrast between euphemistic and explicit naming becomes particularly visible when aggregated into a simplified time series. @fig-framing-shift-summary contrasts normalized frequencies of selected euphemistic framings with explicit naming practices per million words over time.</span>
 <span id="cb97-1976"><a href="#cb97-1976" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb97-1977"><a href="#cb97-1977" aria-hidden="true" tabindex="-1"></a>While absolute frequencies fluctuate with overall media volume and event-driven attention, the relative trajectories suggest a declining reliance on euphemistic framings alongside a gradual increase in explicit naming.</span>
 <span id="cb97-1978"><a href="#cb97-1978" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-1981"><a href="#cb97-1981" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
-<span id="cb97-1982"><a href="#cb97-1982" aria-hidden="true" tabindex="-1"></a><span class="co"># | label: framing-shift-summary</span></span>
-<span id="cb97-1983"><a href="#cb97-1983" aria-hidden="true" tabindex="-1"></a><span class="co"># | fig-cap: Euphemistic versus explicit framing over time (frequency per million words). The plot contrasts aggregated euphemistic framings (e.g. *Familiendrama*, *Beziehungstat*) with explicit naming (e.g. *Femizid*, *Feminizid*, *Frauenmord*).</span></span>
-<span id="cb97-1984"><a href="#cb97-1984" aria-hidden="true" tabindex="-1"></a>euphemistic_terms <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Familiendrama"</span>, <span class="st">"Familientragödie"</span>, <span class="st">"Beziehungstat"</span>, <span class="st">"Ehestreit"</span>)</span>
-<span id="cb97-1985"><a href="#cb97-1985" aria-hidden="true" tabindex="-1"></a>explicit_terms <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Femizid"</span>, <span class="st">"Feminizid"</span>, <span class="st">"Frauenmord"</span>)</span>
-<span id="cb97-1986"><a href="#cb97-1986" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-1987"><a href="#cb97-1987" aria-hidden="true" tabindex="-1"></a>media_terms <span class="ot">&lt;-</span> media_data <span class="sc">%&gt;%</span></span>
-<span id="cb97-1988"><a href="#cb97-1988" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(content), content <span class="sc">!=</span> <span class="st">""</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb97-1989"><a href="#cb97-1989" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb97-1990"><a href="#cb97-1990" aria-hidden="true" tabindex="-1"></a>    <span class="at">year =</span> <span class="fu">as.numeric</span>(year),</span>
-<span id="cb97-1991"><a href="#cb97-1991" aria-hidden="true" tabindex="-1"></a>    <span class="at">content_lower =</span> stringr<span class="sc">::</span><span class="fu">str_to_lower</span>(content),</span>
-<span id="cb97-1992"><a href="#cb97-1992" aria-hidden="true" tabindex="-1"></a>    <span class="at">word_count =</span> stringr<span class="sc">::</span><span class="fu">str_count</span>(content_lower, <span class="st">"</span><span class="sc">\\</span><span class="st">S+"</span>)</span>
-<span id="cb97-1993"><a href="#cb97-1993" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
-<span id="cb97-1994"><a href="#cb97-1994" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(year), year <span class="sc">&gt;=</span> <span class="dv">2000</span>, year <span class="sc">&lt;=</span> <span class="dv">2025</span>)</span>
-<span id="cb97-1995"><a href="#cb97-1995" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-1996"><a href="#cb97-1996" aria-hidden="true" tabindex="-1"></a>total_words_year <span class="ot">&lt;-</span> media_terms <span class="sc">%&gt;%</span></span>
-<span id="cb97-1997"><a href="#cb97-1997" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(year) <span class="sc">%&gt;%</span></span>
-<span id="cb97-1998"><a href="#cb97-1998" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">total_words =</span> <span class="fu">sum</span>(word_count), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span>
-<span id="cb97-1999"><a href="#cb97-1999" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-2000"><a href="#cb97-2000" aria-hidden="true" tabindex="-1"></a>make_term_regex <span class="ot">&lt;-</span> <span class="cf">function</span>(term) {</span>
-<span id="cb97-2001"><a href="#cb97-2001" aria-hidden="true" tabindex="-1"></a>  term <span class="ot">&lt;-</span> stringr<span class="sc">::</span><span class="fu">str_to_lower</span>(term)</span>
-<span id="cb97-2002"><a href="#cb97-2002" aria-hidden="true" tabindex="-1"></a>  parts <span class="ot">&lt;-</span> <span class="fu">strsplit</span>(term, <span class="st">"</span><span class="sc">\\</span><span class="st">s+"</span>)[[<span class="dv">1</span>]]</span>
-<span id="cb97-2003"><a href="#cb97-2003" aria-hidden="true" tabindex="-1"></a>  <span class="fu">paste0</span>(<span class="st">"</span><span class="sc">\\</span><span class="st">b"</span>, <span class="fu">paste</span>(parts, <span class="at">collapse =</span> <span class="st">"</span><span class="sc">\\</span><span class="st">s+"</span>), <span class="st">"</span><span class="sc">\\</span><span class="st">b"</span>)</span>
-<span id="cb97-2004"><a href="#cb97-2004" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb97-2005"><a href="#cb97-2005" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-2006"><a href="#cb97-2006" aria-hidden="true" tabindex="-1"></a>count_terms <span class="ot">&lt;-</span> <span class="cf">function</span>(terms, label) {</span>
-<span id="cb97-2007"><a href="#cb97-2007" aria-hidden="true" tabindex="-1"></a>  counts <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">bind_rows</span>(<span class="fu">lapply</span>(terms, <span class="cf">function</span>(term) {</span>
-<span id="cb97-2008"><a href="#cb97-2008" aria-hidden="true" tabindex="-1"></a>    pattern <span class="ot">&lt;-</span> <span class="fu">make_term_regex</span>(term)</span>
-<span id="cb97-2009"><a href="#cb97-2009" aria-hidden="true" tabindex="-1"></a>    media_terms <span class="sc">%&gt;%</span></span>
-<span id="cb97-2010"><a href="#cb97-2010" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mutate</span>(<span class="at">count =</span> stringr<span class="sc">::</span><span class="fu">str_count</span>(content_lower, pattern)) <span class="sc">%&gt;%</span></span>
-<span id="cb97-2011"><a href="#cb97-2011" aria-hidden="true" tabindex="-1"></a>      <span class="fu">group_by</span>(year) <span class="sc">%&gt;%</span></span>
-<span id="cb97-2012"><a href="#cb97-2012" aria-hidden="true" tabindex="-1"></a>      <span class="fu">summarise</span>(<span class="at">count =</span> <span class="fu">sum</span>(count), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span>
-<span id="cb97-2013"><a href="#cb97-2013" aria-hidden="true" tabindex="-1"></a>  }))</span>
-<span id="cb97-2014"><a href="#cb97-2014" aria-hidden="true" tabindex="-1"></a>  counts <span class="sc">%&gt;%</span></span>
-<span id="cb97-2015"><a href="#cb97-2015" aria-hidden="true" tabindex="-1"></a>    <span class="fu">group_by</span>(year) <span class="sc">%&gt;%</span></span>
-<span id="cb97-2016"><a href="#cb97-2016" aria-hidden="true" tabindex="-1"></a>    <span class="fu">summarise</span>(<span class="at">count =</span> <span class="fu">sum</span>(count), <span class="at">.groups =</span> <span class="st">"drop"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb97-2017"><a href="#cb97-2017" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">group =</span> label)</span>
-<span id="cb97-2018"><a href="#cb97-2018" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb97-2019"><a href="#cb97-2019" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-2020"><a href="#cb97-2020" aria-hidden="true" tabindex="-1"></a>group_counts <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
-<span id="cb97-2021"><a href="#cb97-2021" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count_terms</span>(euphemistic_terms, <span class="st">"Euphemistic framing"</span>),</span>
-<span id="cb97-2022"><a href="#cb97-2022" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count_terms</span>(explicit_terms, <span class="st">"Explicit naming"</span>)</span>
-<span id="cb97-2023"><a href="#cb97-2023" aria-hidden="true" tabindex="-1"></a>) <span class="sc">%&gt;%</span></span>
-<span id="cb97-2024"><a href="#cb97-2024" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(total_words_year, <span class="at">by =</span> <span class="st">"year"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb97-2025"><a href="#cb97-2025" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">freq_per_million =</span> (count <span class="sc">/</span> total_words) <span class="sc">*</span> <span class="fl">1e6</span>)</span>
-<span id="cb97-2026"><a href="#cb97-2026" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-2027"><a href="#cb97-2027" aria-hidden="true" tabindex="-1"></a>p_framing_shift <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(group_counts, <span class="fu">aes</span>(<span class="at">x =</span> year, <span class="at">y =</span> freq_per_million, <span class="at">color =</span> group)) <span class="sc">+</span></span>
-<span id="cb97-2028"><a href="#cb97-2028" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="at">linewidth =</span> <span class="fl">1.1</span>, <span class="at">alpha =</span> <span class="fl">0.9</span>) <span class="sc">+</span></span>
-<span id="cb97-2029"><a href="#cb97-2029" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
-<span id="cb97-2030"><a href="#cb97-2030" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb97-2031"><a href="#cb97-2031" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Euphemistic vs explicit framing over time"</span>,</span>
-<span id="cb97-2032"><a href="#cb97-2032" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"Frequency per million words"</span>,</span>
-<span id="cb97-2033"><a href="#cb97-2033" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Year"</span>, <span class="at">y =</span> <span class="st">"Frequency per million words"</span>, <span class="at">color =</span> <span class="cn">NULL</span></span>
-<span id="cb97-2034"><a href="#cb97-2034" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb97-2035"><a href="#cb97-2035" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">"bottom"</span>)</span>
-<span id="cb97-2036"><a href="#cb97-2036" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-2037"><a href="#cb97-2037" aria-hidden="true" tabindex="-1"></a>p_framing_shift</span>
-<span id="cb97-2038"><a href="#cb97-2038" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb97-1979"><a href="#cb97-1979" aria-hidden="true" tabindex="-1"></a><span class="in">```{r framing-shift-summary}</span></span>
+<span id="cb97-1980"><a href="#cb97-1980" aria-hidden="true" tabindex="-1"></a><span class="co"># | label: fig-framing-shift-summary</span></span>
+<span id="cb97-1981"><a href="#cb97-1981" aria-hidden="true" tabindex="-1"></a><span class="co"># | fig-cap: Euphemistic versus explicit framing over time (frequency per million words). The plot contrasts aggregated euphemistic framings (e.g. *Familiendrama*, *Beziehungstat*) with explicit naming (e.g. *Femizid*, *Feminizid*, *Frauenmord*).</span></span>
+<span id="cb97-1982"><a href="#cb97-1982" aria-hidden="true" tabindex="-1"></a>euphemistic_terms <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Familiendrama"</span>, <span class="st">"Familientragödie"</span>, <span class="st">"Beziehungstat"</span>, <span class="st">"Ehestreit"</span>)</span>
+<span id="cb97-1983"><a href="#cb97-1983" aria-hidden="true" tabindex="-1"></a>explicit_terms <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Femizid"</span>, <span class="st">"Feminizid"</span>, <span class="st">"Frauenmord"</span>)</span>
+<span id="cb97-1984"><a href="#cb97-1984" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb97-1985"><a href="#cb97-1985" aria-hidden="true" tabindex="-1"></a>media_terms <span class="ot">&lt;-</span> media_data <span class="sc">%&gt;%</span></span>
+<span id="cb97-1986"><a href="#cb97-1986" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(content), content <span class="sc">!=</span> <span class="st">""</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb97-1987"><a href="#cb97-1987" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb97-1988"><a href="#cb97-1988" aria-hidden="true" tabindex="-1"></a>    <span class="at">year =</span> <span class="fu">as.numeric</span>(year),</span>
+<span id="cb97-1989"><a href="#cb97-1989" aria-hidden="true" tabindex="-1"></a>    <span class="at">content_lower =</span> stringr<span class="sc">::</span><span class="fu">str_to_lower</span>(content),</span>
+<span id="cb97-1990"><a href="#cb97-1990" aria-hidden="true" tabindex="-1"></a>    <span class="at">word_count =</span> stringr<span class="sc">::</span><span class="fu">str_count</span>(content_lower, <span class="st">"</span><span class="sc">\\</span><span class="st">S+"</span>)</span>
+<span id="cb97-1991"><a href="#cb97-1991" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb97-1992"><a href="#cb97-1992" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(year), year <span class="sc">&gt;=</span> <span class="dv">2000</span>, year <span class="sc">&lt;=</span> <span class="dv">2025</span>)</span>
+<span id="cb97-1993"><a href="#cb97-1993" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb97-1994"><a href="#cb97-1994" aria-hidden="true" tabindex="-1"></a>total_words_year <span class="ot">&lt;-</span> media_terms <span class="sc">%&gt;%</span></span>
+<span id="cb97-1995"><a href="#cb97-1995" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(year) <span class="sc">%&gt;%</span></span>
+<span id="cb97-1996"><a href="#cb97-1996" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">total_words =</span> <span class="fu">sum</span>(word_count), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span>
+<span id="cb97-1997"><a href="#cb97-1997" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb97-1998"><a href="#cb97-1998" aria-hidden="true" tabindex="-1"></a>make_term_regex <span class="ot">&lt;-</span> <span class="cf">function</span>(term) {</span>
+<span id="cb97-1999"><a href="#cb97-1999" aria-hidden="true" tabindex="-1"></a>  term <span class="ot">&lt;-</span> stringr<span class="sc">::</span><span class="fu">str_to_lower</span>(term)</span>
+<span id="cb97-2000"><a href="#cb97-2000" aria-hidden="true" tabindex="-1"></a>  parts <span class="ot">&lt;-</span> <span class="fu">strsplit</span>(term, <span class="st">"</span><span class="sc">\\</span><span class="st">s+"</span>)[[<span class="dv">1</span>]]</span>
+<span id="cb97-2001"><a href="#cb97-2001" aria-hidden="true" tabindex="-1"></a>  <span class="fu">paste0</span>(<span class="st">"</span><span class="sc">\\</span><span class="st">b"</span>, <span class="fu">paste</span>(parts, <span class="at">collapse =</span> <span class="st">"</span><span class="sc">\\</span><span class="st">s+"</span>), <span class="st">"</span><span class="sc">\\</span><span class="st">b"</span>)</span>
+<span id="cb97-2002"><a href="#cb97-2002" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb97-2003"><a href="#cb97-2003" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb97-2004"><a href="#cb97-2004" aria-hidden="true" tabindex="-1"></a>count_terms <span class="ot">&lt;-</span> <span class="cf">function</span>(terms, label) {</span>
+<span id="cb97-2005"><a href="#cb97-2005" aria-hidden="true" tabindex="-1"></a>  counts <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">bind_rows</span>(<span class="fu">lapply</span>(terms, <span class="cf">function</span>(term) {</span>
+<span id="cb97-2006"><a href="#cb97-2006" aria-hidden="true" tabindex="-1"></a>    pattern <span class="ot">&lt;-</span> <span class="fu">make_term_regex</span>(term)</span>
+<span id="cb97-2007"><a href="#cb97-2007" aria-hidden="true" tabindex="-1"></a>    media_terms <span class="sc">%&gt;%</span></span>
+<span id="cb97-2008"><a href="#cb97-2008" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mutate</span>(<span class="at">count =</span> stringr<span class="sc">::</span><span class="fu">str_count</span>(content_lower, pattern)) <span class="sc">%&gt;%</span></span>
+<span id="cb97-2009"><a href="#cb97-2009" aria-hidden="true" tabindex="-1"></a>      <span class="fu">group_by</span>(year) <span class="sc">%&gt;%</span></span>
+<span id="cb97-2010"><a href="#cb97-2010" aria-hidden="true" tabindex="-1"></a>      <span class="fu">summarise</span>(<span class="at">count =</span> <span class="fu">sum</span>(count), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span>
+<span id="cb97-2011"><a href="#cb97-2011" aria-hidden="true" tabindex="-1"></a>  }))</span>
+<span id="cb97-2012"><a href="#cb97-2012" aria-hidden="true" tabindex="-1"></a>  counts <span class="sc">%&gt;%</span></span>
+<span id="cb97-2013"><a href="#cb97-2013" aria-hidden="true" tabindex="-1"></a>    <span class="fu">group_by</span>(year) <span class="sc">%&gt;%</span></span>
+<span id="cb97-2014"><a href="#cb97-2014" aria-hidden="true" tabindex="-1"></a>    <span class="fu">summarise</span>(<span class="at">count =</span> <span class="fu">sum</span>(count), <span class="at">.groups =</span> <span class="st">"drop"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb97-2015"><a href="#cb97-2015" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">group =</span> label)</span>
+<span id="cb97-2016"><a href="#cb97-2016" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb97-2017"><a href="#cb97-2017" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb97-2018"><a href="#cb97-2018" aria-hidden="true" tabindex="-1"></a>group_counts <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
+<span id="cb97-2019"><a href="#cb97-2019" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count_terms</span>(euphemistic_terms, <span class="st">"Euphemistic framing"</span>),</span>
+<span id="cb97-2020"><a href="#cb97-2020" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count_terms</span>(explicit_terms, <span class="st">"Explicit naming"</span>)</span>
+<span id="cb97-2021"><a href="#cb97-2021" aria-hidden="true" tabindex="-1"></a>) <span class="sc">%&gt;%</span></span>
+<span id="cb97-2022"><a href="#cb97-2022" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(total_words_year, <span class="at">by =</span> <span class="st">"year"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb97-2023"><a href="#cb97-2023" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">freq_per_million =</span> (count <span class="sc">/</span> total_words) <span class="sc">*</span> <span class="fl">1e6</span>)</span>
+<span id="cb97-2024"><a href="#cb97-2024" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb97-2025"><a href="#cb97-2025" aria-hidden="true" tabindex="-1"></a>p_framing_shift <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(group_counts, <span class="fu">aes</span>(<span class="at">x =</span> year, <span class="at">y =</span> freq_per_million, <span class="at">color =</span> group)) <span class="sc">+</span></span>
+<span id="cb97-2026"><a href="#cb97-2026" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="at">linewidth =</span> <span class="fl">1.1</span>, <span class="at">alpha =</span> <span class="fl">0.9</span>) <span class="sc">+</span></span>
+<span id="cb97-2027"><a href="#cb97-2027" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb97-2028"><a href="#cb97-2028" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb97-2029"><a href="#cb97-2029" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Euphemistic vs explicit framing over time"</span>,</span>
+<span id="cb97-2030"><a href="#cb97-2030" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"Frequency per million words"</span>,</span>
+<span id="cb97-2031"><a href="#cb97-2031" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Year"</span>, <span class="at">y =</span> <span class="st">"Frequency per million words"</span>, <span class="at">color =</span> <span class="cn">NULL</span></span>
+<span id="cb97-2032"><a href="#cb97-2032" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb97-2033"><a href="#cb97-2033" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">"bottom"</span>)</span>
+<span id="cb97-2034"><a href="#cb97-2034" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb97-2035"><a href="#cb97-2035" aria-hidden="true" tabindex="-1"></a>p_framing_shift</span>
+<span id="cb97-2036"><a href="#cb97-2036" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb97-2037"><a href="#cb97-2037" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb97-2038"><a href="#cb97-2038" aria-hidden="true" tabindex="-1"></a><span class="fu">## Visibility, absence, and epistemic limits</span></span>
 <span id="cb97-2039"><a href="#cb97-2039" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-2040"><a href="#cb97-2040" aria-hidden="true" tabindex="-1"></a><span class="fu">## Visibility, absence, and epistemic limits</span></span>
+<span id="cb97-2040"><a href="#cb97-2040" aria-hidden="true" tabindex="-1"></a>While the observed trends point toward increased explicitness in some parts of media discourse, a central limitation of this analysis lies in what cannot be made visible through the data. The corpus consists exclusively of media reporting indexed in Swissdox. Acts of lethal violence against women that were not reported, were reported only marginally, or were linguistically attenuated beyond recognition remain structurally absent.</span>
 <span id="cb97-2041"><a href="#cb97-2041" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-2042"><a href="#cb97-2042" aria-hidden="true" tabindex="-1"></a>While the observed trends point toward increased explicitness in some parts of media discourse, a central limitation of this analysis lies in what cannot be made visible through the data. The corpus consists exclusively of media reporting indexed in Swissdox. Acts of lethal violence against women that were not reported, were reported only marginally, or were linguistically attenuated beyond recognition remain structurally absent.</span>
+<span id="cb97-2042"><a href="#cb97-2042" aria-hidden="true" tabindex="-1"></a>From a feminist data perspective, this absence is not incidental. As argued by @dignazio_klein_data_feminism_2020, data infrastructures do not neutrally represent reality; they actively shape what becomes visible, legible, and countable. In the context of feminicide, the lack of official statistics and the reliance on activist counting practices underscore that visibility itself is politically contested. What enters the corpus is not feminicide as such, but media-recognized and linguistically articulated instances of violence.</span>
 <span id="cb97-2043"><a href="#cb97-2043" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-2044"><a href="#cb97-2044" aria-hidden="true" tabindex="-1"></a>From a feminist data perspective, this absence is not incidental. As argued by @dignazio_klein_data_feminism_2020, data infrastructures do not neutrally represent reality; they actively shape what becomes visible, legible, and countable. In the context of feminicide, the lack of official statistics and the reliance on activist counting practices underscore that visibility itself is politically contested. What enters the corpus is not feminicide as such, but media-recognized and linguistically articulated instances of violence.</span>
+<span id="cb97-2044"><a href="#cb97-2044" aria-hidden="true" tabindex="-1"></a>This has direct implications for interpretation. Killings framed without gender markers, relational descriptors, or recognizable violence terms may never enter the analytical space. In this sense, the corpus captures discursive recognition rather than empirical prevalence. The silences in the data are therefore analytically meaningful, even though they cannot be directly quantified.</span>
 <span id="cb97-2045"><a href="#cb97-2045" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-2046"><a href="#cb97-2046" aria-hidden="true" tabindex="-1"></a>This has direct implications for interpretation. Killings framed without gender markers, relational descriptors, or recognizable violence terms may never enter the analytical space. In this sense, the corpus captures discursive recognition rather than empirical prevalence. The silences in the data are therefore analytically meaningful, even though they cannot be directly quantified.</span>
+<span id="cb97-2046"><a href="#cb97-2046" aria-hidden="true" tabindex="-1"></a>A further limitation concerns event-driven distortions. High-profile cases can dominate coverage and skew term distributions. In our dataset, repeated references to *Hochseilartist* trace back to extensive reporting on the Freddy-Nock case, which ultimately ended in an acquittal <span class="co">[</span><span class="ot">@noauthor_toxische_2020</span><span class="co">]</span>. Such cases illustrate how individual media events can introduce semantic noise that is unrelated to feminicide discourse as such.</span>
 <span id="cb97-2047"><a href="#cb97-2047" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-2048"><a href="#cb97-2048" aria-hidden="true" tabindex="-1"></a>A further limitation concerns event-driven distortions. High-profile cases can dominate coverage and skew term distributions. In our dataset, repeated references to *Hochseilartist* trace back to extensive reporting on the Freddy-Nock case, which ultimately ended in an acquittal <span class="co">[</span><span class="ot">@noauthor_toxische_2020</span><span class="co">]</span>. Such cases illustrate how individual media events can introduce semantic noise that is unrelated to feminicide discourse as such.</span>
+<span id="cb97-2048"><a href="#cb97-2048" aria-hidden="true" tabindex="-1"></a><span class="fu">## Exploratory intent and methodological reflexivity</span></span>
 <span id="cb97-2049"><a href="#cb97-2049" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-2050"><a href="#cb97-2050" aria-hidden="true" tabindex="-1"></a><span class="fu">## Exploratory intent and methodological reflexivity</span></span>
+<span id="cb97-2050"><a href="#cb97-2050" aria-hidden="true" tabindex="-1"></a>It is therefore essential to emphasize the exploratory character of this project. We do not claim to have identified a definitive vocabulary, an exhaustive corpus, or a stable typology of framings. Especially in the first iteration, the central aim was term discovery: exploring how different ways of naming cluster, overlap, or remain isolated within the corpus.</span>
 <span id="cb97-2051"><a href="#cb97-2051" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-2052"><a href="#cb97-2052" aria-hidden="true" tabindex="-1"></a>It is therefore essential to emphasize the exploratory character of this project. We do not claim to have identified a definitive vocabulary, an exhaustive corpus, or a stable typology of framings. Especially in the first iteration, the central aim was term discovery: exploring how different ways of naming cluster, overlap, or remain isolated within the corpus.</span>
+<span id="cb97-2052"><a href="#cb97-2052" aria-hidden="true" tabindex="-1"></a>The use of Word2Vec embeddings was instrumental in this regard. By modeling distributional similarity rather than predefined categories, the method led us toward blind spots and unexpected associations that challenged the initial keyword set. Some suggested neighbors proved analytically productive; others revealed ambiguity, noise, or misleading overlaps. Both outcomes are valuable, as they expose the limits of intuition-driven keyword selection and foreground the interpretive work required in computational discourse analysis.</span>
 <span id="cb97-2053"><a href="#cb97-2053" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-2054"><a href="#cb97-2054" aria-hidden="true" tabindex="-1"></a>The use of Word2Vec embeddings was instrumental in this regard. By modeling distributional similarity rather than predefined categories, the method led us toward blind spots and unexpected associations that challenged the initial keyword set. Some suggested neighbors proved analytically productive; others revealed ambiguity, noise, or misleading overlaps. Both outcomes are valuable, as they expose the limits of intuition-driven keyword selection and foreground the interpretive work required in computational discourse analysis.</span>
+<span id="cb97-2054"><a href="#cb97-2054" aria-hidden="true" tabindex="-1"></a>We deliberately refrain from drawing strong or conclusive claims. Given the ethical and political stakes of researching gendered violence, epistemic modesty is warranted. The contribution of this study lies less in its substantive findings than in its process: demonstrating how computational methods can be used reflexively to explore discursive change, identify blind spots, and foreground the politics of visibility in large-scale text data. Rather than offering closure, the analysis opens further questions about how gendered violence is named, normalized, or silenced—and how such processes might be studied more rigorously in future work.</span>
 <span id="cb97-2055"><a href="#cb97-2055" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-2056"><a href="#cb97-2056" aria-hidden="true" tabindex="-1"></a>We deliberately refrain from drawing strong or conclusive claims. Given the ethical and political stakes of researching gendered violence, epistemic modesty is warranted. The contribution of this study lies less in its substantive findings than in its process: demonstrating how computational methods can be used reflexively to explore discursive change, identify blind spots, and foreground the politics of visibility in large-scale text data. Rather than offering closure, the analysis opens further questions about how gendered violence is named, normalized, or silenced—and how such processes might be studied more rigorously in future work.</span>
+<span id="cb97-2056"><a href="#cb97-2056" aria-hidden="true" tabindex="-1"></a><span class="fu"># References {.unnumbered}</span></span>
 <span id="cb97-2057"><a href="#cb97-2057" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-2058"><a href="#cb97-2058" aria-hidden="true" tabindex="-1"></a><span class="fu"># References {.unnumbered}</span></span>
-<span id="cb97-2059"><a href="#cb97-2059" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb97-2060"><a href="#cb97-2060" aria-hidden="true" tabindex="-1"></a>::: {#refs}</span>
-<span id="cb97-2061"><a href="#cb97-2061" aria-hidden="true" tabindex="-1"></a>:::</span>
-</code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb97-2058"><a href="#cb97-2058" aria-hidden="true" tabindex="-1"></a>::: {#refs}</span>
+<span id="cb97-2059"><a href="#cb97-2059" aria-hidden="true" tabindex="-1"></a>:::</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 
