@@ -103,7 +103,9 @@ For setup instructions and troubleshooting, see: <https://quanteda.io/articles/p
 Swissdox API calls are also inherently slow and may take hours for large queries.
 :::
 
-```{r setup, cache=FALSE}
+```{r}
+#| label: setup
+#| cache: false
 required_packages <- c(
   "httr", "jsonlite", "yaml", "dotenv", "R6",
   "dplyr", "ggplot2", "stringr", "tidytext", "readr", "tidyr",
@@ -126,14 +128,14 @@ invisible(lapply(required_packages, function(pkg) {
 
 # API Wrapper laden
 source("swissdox_api.R")
-
 ```
 
 ## Configuration
 
 Centralized API access, checkpoint utilities, and text configuration. We define API credentials and guard flags here to prevent accidental re-fetching of large datasets. Checkpoint helpers standardize saving and loading of intermediate objects, which keeps the pipeline restartable and transparent. The same block also defines text-processing defaults (e.g., stemming and compound patterns) so that all later analyses rely on the same linguistic assumptions. This is crucial for comparability across time windows: we want observed shifts to reflect discourse change, not shifting preprocessing settings. By keeping configuration centralized, we can document methodological choices once and minimize hidden changes.
 
-```{r document-setup}
+```{r}
+#| label: document-setup
 # Load environment variables from local.env
 if (file.exists("local.env")) {
   load_dot_env("local.env")
@@ -266,7 +268,8 @@ normalize_terms_for_model <- function(terms) {
 
 These terms are the basis for the queries. We define them centrally to keep usage consistent across analysis and API calls. The list deliberately combines explicit feminicide terms with euphemistic or relational framings to capture competing discourse styles. This allows us to quantify whether explicit terms rise while euphemistic terms decline. By declaring the list here, we also make the operationalization transparent and open to critique. Later analyses use the same vocabulary so that shifts are interpretable as changes in usage rather than changes in definitions. This is a core methodological choice for the paper.
 
-```{r keyword-definitions}
+```{r}
+#| label: keyword-definitions
 
 feminizid_keywords <- c(
   "Feminizid", "Femizid", "Frauenmord",
@@ -285,12 +288,19 @@ Build and run the Swissdox query. Use the checkpoint load block to resume withou
 
 We start with a broad exploratory query using the original keyword list (OR).
 
-```{r checkpoint-load-raw, echo=FALSE, results="hide", message=FALSE, warning=FALSE}
+```{r}
+#| label: checkpoint-load-raw
+#| echo: false
+#| results: hide
+#| message: false
+#| warning: false
 # Checkpoint load (raw data)
 load_checkpoint("feminizid_raw_data", "media_data")
 ```
 
-```{r feminizid-data-collection, cache=FALSE}
+```{r}
+#| label: feminizid-data-collection
+#| cache: false
 # Skip if a checkpoint exists unless explicitly forced
 existing_firstpass <- latest_checkpoint("feminizid_raw_data")
 if (!RUN_FIRST_PASS_QUERY || (!FORCE_FIRST_PASS_QUERY && !is.null(existing_firstpass))) {
@@ -333,7 +343,8 @@ We load raw documents, clean fields, and create time variables for later aggrega
 
 Load raw data (from checkpoint or TSV), clean fields, and prepare time variables used in analysis.
 
-```{r data-preparation}
+```{r}
+#| label: data-preparation
 # Load data (checkpoint first, TSV fallback)
 raw_file <- load_checkpoint("feminizid_raw_data", "media_data")
 if (is.null(raw_file)) {
@@ -352,7 +363,8 @@ if (is.null(raw_file)) {
 }
 ```
 
-```{r data-cleaning}
+```{r}
+#| label: data-cleaning
 
 # Prepare data (if not already done)
 # Convert dates and create time variables
@@ -379,7 +391,10 @@ We first summarize coverage over time and identify the most frequent terms and s
 
 At this stage we want to know whether the dataset behaves plausibly: are there enough documents per year, and do the most prominent outlets match expectations for Swiss media? These checks are not merely descriptive; they guard against systematic biases introduced by API filters or source coverage. We also look at headline keywords and their temporal patterns to establish whether the vocabulary shift we hypothesize is visible in simple counts. This helps anchor later embedding interpretations in observable frequency trends. In short, the intermediary results provide a sanity check and an empirical baseline.
 
-```{r overview-analysis}
+```{r}
+#| label: overview-analysis
+#| fig-cap: "Coverage overview and outlet distribution."
+#| fig-subcap: ["Articles per year", "Top outlets", "Monthly trend (last five years)"]
 
 # 1. Articles per year
 yearly_counts <- media_data %>%
@@ -433,7 +448,9 @@ data_overview <- tibble::tibble(
 data_overview
 ```
 
-```{r keyword-analysis}
+```{r}
+#| label: keyword-analysis
+#| fig-cap: "Keyword frequency in headlines (counts across corpus)."
 
 # Keyword frequency in headlines (central definition)
 keyword_counts <- data.frame(keyword = character(), count = numeric())
@@ -460,7 +477,10 @@ print(p4)
 keyword_counts
 ```
 
-```{r time-trends}
+```{r}
+#| label: time-trends
+#| fig-cap: "Keyword trends over time."
+#| fig-subcap: ["Absolute counts per year", "Heatmap of keyword intensity by year"]
 
 # Keyword time trends (central definition)
 keyword_timeline <- data.frame()
@@ -530,7 +550,9 @@ trend_summary <- keyword_timeline %>%
 trend_summary
 ```
 
-```{r target-term-trends}
+```{r}
+#| label: target-term-trends
+#| fig-cap: "Framing groups over time (frequency per million words)."
 # Normalized frequency over time for grouped target terms
 USE_SMOOTH <- TRUE
 
@@ -603,13 +625,19 @@ print(p_terms_time)
 
 Build a quanteda corpus and a trimmed DFM from the cleaned articles. Use the checkpoint load block to resume without reprocessing. We create a linguistically consistent representation of the texts by removing boilerplate, normalizing case, and applying tailored stopword lists. This reduces noise from high-frequency function words and newsroom metadata. The document-feature matrix is the standard input for frequency analysis and embedding pipelines, so this step is foundational. Trimming parameters remove extremely rare and overly frequent terms to balance coverage with computational feasibility. These choices are methodological and therefore documented explicitly.
 
-```{r checkpoint-load-corpus, echo=FALSE, results="hide", message=FALSE, warning=FALSE}
+```{r}
+#| label: checkpoint-load-corpus
+#| echo: false
+#| results: hide
+#| message: false
+#| warning: false
 # Checkpoint load (corpus/dfm)
 load_checkpoint("feminizid_corpus", "feminizid_corpus")
 load_checkpoint("feminizid_dfm", "feminizid_dfm_trimmed")
 ```
 
-```{r corpus-setup}
+```{r}
+#| label: corpus-setup
 
 corpus_data <- media_data %>%
   distinct(id, .keep_all = TRUE) %>%
@@ -651,7 +679,8 @@ summary(feminizid_corpus, n = 3)
 save_checkpoint(feminizid_corpus, "feminizid_corpus")
 ```
 
-```{r text-preprocessing}
+```{r}
+#| label: text-preprocessing
 
 # Load German stopwords
 german_stopwords <- readLines("german_stopwords_full.txt", encoding = "UTF-8")
@@ -737,7 +766,12 @@ if (nfeat(feminizid_dfm_trimmed) > 0) {
 }
 ```
 
-```{r checkpoint-save-dfm, echo=FALSE, results="hide", message=FALSE, warning=FALSE}
+```{r}
+#| label: checkpoint-save-dfm
+#| echo: false
+#| results: hide
+#| message: false
+#| warning: false
 # Checkpoint save (DFM and optional corpus)
 if (nfeat(feminizid_dfm_trimmed) > 0) {
   save_checkpoint(feminizid_dfm_trimmed, "feminizid_dfm")
@@ -747,7 +781,10 @@ if (SAVE_CORPUS) {
 }
 ```
 
-```{r visualization}
+```{r}
+#| label: visualization
+#| fig-cap: "Lexical visualization and frequency normalization."
+#| fig-subcap: ["Top terms wordcloud", "Top terms over time (absolute)", "Top terms over time (per 1000 articles)", "Article distribution over time"]
 # Use quanteda.textplots if available, otherwise fallback to wordcloud
 if ("textplot_wordcloud" %in% ls("package:quanteda.textplots")) {
   textplot_wordcloud(feminizid_dfm_trimmed, 
@@ -847,13 +884,19 @@ The diachronic setup is chosen because embeddings are not comparable across time
 
 Train one Word2Vec model per time window and compare nearest neighbors across periods. Use the checkpoint load block to resume without retraining.
 
-```{r checkpoint-load-word2vec, echo=FALSE, results="hide", message=FALSE, warning=FALSE}
+```{r}
+#| label: checkpoint-load-word2vec
+#| echo: false
+#| results: hide
+#| message: false
+#| warning: false
 # Checkpoint load (Word2Vec)
 load_checkpoint("word2vec_vectors", "word2vec_vectors")
 load_checkpoint("word2vec_frame_shifts", "all_frame_shifts")
 ```
 
-```{r word2vec-setup}
+```{r}
+#| label: word2vec-setup
 # Time windows (5-year bins)
 time_windows <- list(
   "2000-2004" = c(2000, 2004),
@@ -885,7 +928,8 @@ w2v_setup_summary <- tibble::tibble(
 w2v_setup_summary
 ```
 
-```{r word2vec-training}
+```{r}
+#| label: word2vec-training
 
 # Train models for each window + optional full-period model
 existing_vectors <- latest_checkpoint("word2vec_vectors")
@@ -979,7 +1023,8 @@ pb <- if (use_progress) progress::progress_bar$new(
 }
 ```
 
-```{r word2vec-frame-shift}
+```{r}
+#| label: word2vec-frame-shift
 if (is.null(word2vec_vectors)) {
   stop("No word2vec vectors available. Run the training chunk once.")
 }
@@ -1056,7 +1101,9 @@ if (length(window_models) >= 2) {
 
 These plots visualize which neighbors appear around each target term in different time windows. The heatmaps highlight continuity and change in contextual proximity, while the stability summary aggregates whether relations are stable or volatile across periods. This is meant as a descriptive lens on shifting discourse, not a definitive semantic map.
 
-```{r word2vec-visualization}
+```{r}
+#| label: word2vec-visualization
+#| fig-cap: "Frame-shift heatmaps and stability summary."
 
 # Visualisierung 1: Heatmap der Frame-Shifts
 # Top neighbors across all time windows
@@ -1148,7 +1195,9 @@ Caveats: - Distances are mainly meaningful locally (nearest neighbors). - Global
 
 This diagnostic visualization is meant to communicate local structure, not to claim stable global geometry. It helps verify that target terms sit near plausible contextual neighbors and that the model is not dominated by artifacts. We therefore use it as a sanity check and a didactic tool for readers unfamiliar with embeddings. Any apparent “movement” here should be interpreted together with the more formal neighbor tables above. In short, the plot supports interpretation; it does not replace it.
 
-```{r word2vec-local-embedding}
+```{r}
+#| label: word2vec-local-embedding
+#| fig-cap: "Local 3D embedding of target terms and neighbors (UMAP)."
 set.seed(123)
 
 if (is.null(word2vec_vectors)) {
@@ -1228,7 +1277,8 @@ We treat this as a hypothesis-generation step: embeddings suggest related terms,
 
 We use the word2vec neighborhoods to suggest additional search terms that may reflect earlier or alternative framing. It provides a ranked candidate list for curation which can then be added to a subsequent API query in an iterative proggress.
 
-```{r query-expansion}
+```{r}
+#| label: query-expansion
 # Split original keywords into action vs. relation/context (no new terms)
 action_terms <- c(
   "Feminizid", "Femizid", "Frauenmord",
@@ -1422,7 +1472,9 @@ Methodologically, this step operationalizes a trade-off: we accept lower recall 
 
 We run a stricter AND query to keep results manageable. The original keywords are split into two groups (action vs. relation) and combined with curated extra terms. Wildcards are included for single-word terms.
 
-```{r second-pass-query, cache.lazy=FALSE}
+```{r}
+#| label: second-pass-query
+#| cache.lazy: false
 # Wildcards only for single-word terms from the original list
 add_wildcards_single <- function(terms) {
   single <- terms[!grepl("\\s", terms)]
@@ -1519,7 +1571,9 @@ This step mirrors the first iteration to ensure comparability. By applying the s
 
 Clean the second-pass data and build a corpus for downstream analysis.
 
-```{r second-pass-prep, cache.lazy=FALSE}
+```{r}
+#| label: second-pass-prep
+#| cache.lazy: false
 load_checkpoint("feminizid_raw_data_secondpass", "media_data_second")
 
 media_data_second$pubtime <- as.POSIXct(as.character(media_data_second$pubtime), tz = "UTC")
@@ -1548,7 +1602,9 @@ secondpass_corpus <- corpus(
 save_checkpoint(secondpass_corpus, "feminizid_secondpass_corpus")
 ```
 
-```{r second-pass-filter-rubrics, cache.lazy=FALSE}
+```{r}
+#| label: second-pass-filter-rubrics
+#| cache.lazy: false
 # Filter out broad international rubrics for a more focused second-pass set
 # (keeps the raw checkpoint intact; only affects downstream analysis)
 media_data_second <- media_data_second %>%
@@ -1567,7 +1623,9 @@ secondpass_corpus <- corpus(
 
 We summarize the second-pass corpus to check coverage, dominant outlets, and rubric distribution. This ensures the curated query behaves as intended. These summaries serve two purposes. First, they verify that the curated query retrieves a plausible and stable subset of coverage across time. Second, they help interpret later semantic results by showing whether any single outlet or rubric dominates the corpus. We also compute a period contrast to identify terms that are disproportionately associated with later years, which connects directly to the framing-change hypothesis. In short, this section ensures the second-pass dataset is both methodologically sound and substantively interpretable.
 
-```{r second-pass-analysis, cache.lazy=FALSE}
+```{r}
+#| label: second-pass-analysis
+#| cache.lazy: false
 # This block summarizes the curated second-pass corpus.
 # Basic distribution: article counts per year (1990-present)
 articles_second_by_year <- media_data_second %>%
@@ -1650,7 +1708,13 @@ top_contrast <- bind_rows(
 top_contrast %>% select(term, log2_ratio, direction)
 ```
 
-```{r checkpoint-save-secondpass-analysis, cache.lazy=FALSE, echo=FALSE, results="hide", message=FALSE, warning=FALSE}
+```{r}
+#| label: checkpoint-save-secondpass-analysis
+#| cache.lazy: false
+#| echo: false
+#| results: hide
+#| message: false
+#| warning: false
 # Checkpoint save (Second-pass analysis outputs)
 save_checkpoint(top_contrast, "secondpass_key_terms")
 ```
@@ -1663,7 +1727,9 @@ The second-pass embeddings are trained on a more curated corpus, which reduces n
 
 We run a second, focused embedding pass on the filtered second-pass corpus. The goal is to surface terms that describe feminicide framing across 5-year windows.
 
-```{r second-pass-word2vec-setup, cache.lazy=FALSE}
+```{r}
+#| label: second-pass-word2vec-setup
+#| cache.lazy: false
 # Build 5-year windows based on available second-pass years
 min_year_sp <- min(media_data_second$year, na.rm = TRUE)
 max_year_sp <- max(media_data_second$year, na.rm = TRUE)
@@ -1676,7 +1742,9 @@ time_windows_secondpass <- setNames(
 seed_terms_secondpass <- unique(target_map$normalized)
 ```
 
-```{r second-pass-word2vec-training, cache=FALSE}
+```{r}
+#| label: second-pass-word2vec-training
+#| cache: false
 # Train one model per window for the second-pass corpus.
 # Always export plain vectors (no external pointers) for reuse.
 existing_vectors <- latest_checkpoint("word2vec_vectors_secondpass")
@@ -1708,7 +1776,13 @@ if (!RUN_SECOND_PASS_W2V_TRAINING) {
 }
 ```
 
-```{r checkpoint-load-word2vec-secondpass, cache.lazy=FALSE, echo=FALSE, results="hide", message=FALSE, warning=FALSE}
+```{r}
+#| label: checkpoint-load-word2vec-secondpass
+#| cache.lazy: false
+#| echo: false
+#| results: hide
+#| message: false
+#| warning: false
 # Checkpoint load (Second-pass Word2Vec vectors)
 load_checkpoint("word2vec_vectors_secondpass", "word2vec_vectors_secondpass")
 ```
@@ -1717,7 +1791,9 @@ load_checkpoint("word2vec_vectors_secondpass", "word2vec_vectors_secondpass")
 
 We compute nearest neighbors for the curated target list and then visualize semantic movement over time in an aligned 3D space. Alignment is essential because embedding spaces are only identifiable up to rotation. By aligning windows to a shared reference, we can compare relative positions across time without conflating rotation artifacts with semantic change. The visualization is therefore a guided exploration of how specific targets and their neighbors move over time. We keep the point cloud small and label targets to make the plot interpretable. The aim is to provide an intuitive companion to the neighbor tables and to support the narrative of framing change.
 
-```{r second-pass-word2vec-neighbors, cache.lazy=FALSE}
+```{r}
+#| label: second-pass-word2vec-neighbors
+#| cache.lazy: false
 # Collect nearest neighbors for seed terms across windows
 load_checkpoint("word2vec_vectors_secondpass", "word2vec_vectors_secondpass")
 
@@ -1774,7 +1850,10 @@ candidate_terms_secondpass <- neighbors_secondpass %>%
 candidate_terms_secondpass
 ```
 
-```{r second-pass-word2vec-3d, cache.lazy=FALSE}
+```{r}
+#| label: second-pass-word2vec-3d
+#| cache.lazy: false
+#| fig-cap: "Aligned 3D timeline of target terms and neighbors across windows."
 # We align spaces across windows before projecting to 3D. Without alignment,
 # apparent movement may be an artifact of arbitrary embedding rotations.
 # Interactive 3D view across time windows (aligned spaces)
@@ -1972,13 +2051,13 @@ Crucially, these findings should be read as discursive indicators. They speak to
 
 ## Euphemistic versus explicit framing over time
 
-The contrast between euphemistic and explicit naming becomes particularly visible when aggregated into a simplified time series. @framing-shift-summary contrasts normalized frequencies of selected euphemistic framings with explicit naming practices per million words over time.
+The contrast between euphemistic and explicit naming becomes particularly visible when aggregated into a simplified time series. @fig-framing-shift-summary contrasts normalized frequencies of selected euphemistic framings with explicit naming practices per million words over time.
 
 While absolute frequencies fluctuate with overall media volume and event-driven attention, the relative trajectories suggest a declining reliance on euphemistic framings alongside a gradual increase in explicit naming.
 
 ```{r}
-# | label: framing-shift-summary
-# | fig-cap: Euphemistic versus explicit framing over time (frequency per million words). The plot contrasts aggregated euphemistic framings (e.g. *Familiendrama*, *Beziehungstat*) with explicit naming (e.g. *Femizid*, *Feminizid*, *Frauenmord*).
+#| label: fig-framing-shift-summary
+#| fig-cap: "Euphemistic versus explicit framing over time (frequency per million words). The plot contrasts aggregated euphemistic framings (e.g. *Familiendrama*, *Beziehungstat*) with explicit naming (e.g. *Femizid*, *Feminizid*, *Frauenmord*)."
 euphemistic_terms <- c("Familiendrama", "Familientragödie", "Beziehungstat", "Ehestreit")
 explicit_terms <- c("Femizid", "Feminizid", "Frauenmord")
 
