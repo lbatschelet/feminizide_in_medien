@@ -1,94 +1,41 @@
+# Media reporting on feminicide in Swiss news
+
+This project analyzes discursive change in Swiss media reporting on feminicide. It uses the Swissdox@LiRI API to retrieve German-language articles and applies descriptive statistics and diachronic word2vec models to study shifts from euphemistic framing to more explicit naming.
+
+A rendered version of the script is available at https://lbatschelet.github.io/feminizide_in_medien/.
+
+## Access to Swissdox@LiRI
+
+Swissdox@LiRI access is available to members of most Swiss universities. You can log in and manage access via the Swissdox portal:  
+https://swissdox.linguistik.uzh.ch/
+
+## Setup
+
+1) Install [**Quarto**](https://quarto.org/) (required to render the main notebook).  
+2) Create a local environment file with your API credentials.
+
+### Local environment file
+
+Copy `local.env.example` to `local.env` and add your Swissdox credentials:
+
 ```
-Projektname: Medienberichterstattung über Feminizide
-Mitarbeitende: Lukas Batschelet, Linus Kiener
-Seminar: Computational Social Science
-Betreuende: Rudy Farys, Achim Edelmann
+cp local.env.example local.env
 ```
 
-## Idee.
-Unser Projekt hat zum Ziel, Erkenntnisse über die Berichterstattung zu Feminiziden zu ermöglichen. Durch die Swissdox@LiRI API verschaffen wir
-uns (regulär) Zugang zu zahlreichen Medienbeiträgen in der Schweiz, die
-in einem weiteren Schritt durch verschiedene packages und Instrumente in
-R ausgewertet werden könn(t)en. 
+## Main analysis
 
-## Detail.
-Die Swissdox@LiRI API wird über R abgerufen. Sollte dies funktionieren, verzichten wir auf Webscraping/Datamining. Der API werden einerseits
-rohe Textdaten, mit denen linguistische Analysen vorgenommen werden können,
-und andererseits Metadaten entnommen, damit die Daten sinnvoll gefiltert
-werden können.
+The main analysis is in `Notebook.qmd` (Quarto). Render with:
 
+```
+quarto render Notebook.qmd
+```
 
-Meeting Minutes (19.01.2026, 14:00):
+## Files
 
-- Bericht
-    Umfang und Tiefe
-    technische Anforderungen
-
-    -> "es wäre spannend gewesen, die Berichterstattung gegen
-    die tatsächlichen (offiziellen) Daten abzugelichen, doch das ist nicht möglich"
-
-    -> es existieren Guerillia/open-intelligence seiten, doch auch diese Daten sind (natürlicher Weise) unvollständig. (siehe z.B. stopfemizid.ch)
-
-    -> Ethik dahinter evtl. erwähnen
- 
-- Code
-    nur API: limits, dokumentation, etc.\
-    Analysen: wird Wert darauf gelegt\
-    Begriffe, etc.\
-    eigene Analysen erforschen\
-    similarity analysen, co-ocurrence
-
-
-- Daten (insb. Aufbereitung)
-    Deutsch; cleaning\
-    haben wir alle 'Begriffe' erfasst?\
-    machen wir mehrere Loops?\
-    wie machen wir die Filterung?
-
-    wie erfassen wird das Phänomen im letzten Jahrhundert?\
-    wurde darüber berichtet?\
-    in welchem Umfang?
-
-    doppelte Artikel wegen Zentralredaktionen
-
-
-- Analysen
-    Pre-processing:
-
-    word2vec (max. 100 dimensionen)
-    was ist in der Nähe von was?
-    
-    https://www.geeksforgeeks.org/r-machine-learning/word2vec-using-r/
-    "In conclusion, Word2Vec, employing CBOW and Skip-Gram models, generates powerful word embeddings by capturing semantic relationships. CBOW predicts a target word from its context, while Skip-Gram predicts context words from a target word. These embeddings enable NLP tasks and, as demonstrated with airline reviews, showcase the models' ability to find contextually similar words."
-
-    https://medium.com/@manansuri/a-dummys-guide-to-word2vec-456444f3c673
-    "What we then observe is:
-    As expected, “king”, “queen”, “prince” have similar scores for “royalty” and “girl”, “queen” have similar scores for “femininity”.
-    An operation that removes “man” from “king”, would yield in a vector very close to “queen” ( “king”- “man” = “queen”)
-    Vectors “king” and “prince” have the same characteristics, except for age, telling us how they might possibly be semantically related to each other.
-
-    ---
-
-    doc2vec
-
-    https://cran.r-project.org/web/packages/doc2vec/readme/README.html
-    This repository contains an R package allowing to build Paragraph Vector models also known as doc2vec models. You can train the distributed memory (‘PV-DM’) and the distributed bag of words (‘PV-DBOW’) models. Next to that, it also allows to build a top2vec model allowing to cluster documents based on these embeddings. (max. 1000 Wörter pro Doc!)
-
-
----
-
-    
-evtl. racism und sexism (synonym) dictionary\
-Netzwerk-Analyse\
-2 to 1 node projection (evtl. weniger interessant)\
-'ownership' über Begriffe
-
-WiDiD (Word Identity Detection): An approach for detecting semantic shifts through incremental, scalable clustering.
-
-Semantic Shift Detection (SSD): Researchers use computational models, particularly transformer-based models like BERT, to detect when a word's meaning changes across different time periods.
-https://www.uibk.ac.at/en/disc/blog/change-in-word-meaning/#:~:text=28.04.2022,their%20chosen%20words%20%5B1%5D.
-
-evtl. Google n-gram?
-
----
-
+- `Notebook.qmd`: Main analysis notebook (Quarto).
+- `swissdox_api.R`: Swissdox API wrapper helper.
+- `load_raw_tsv.R`: Helper to reload TSV results when caching failed (not used in the final notebook, but helpful during data recovery).
+- `german_stopwords_full.txt`: Curated German stopword list from the solariz repository.  
+  Source: https://github.com/solariz/german_stopwords/tree/master
+- `local.env.example`: Template for API credentials (copy to `local.env`).
+- `library.bib`: References used in the notebook.

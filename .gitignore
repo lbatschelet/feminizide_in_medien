@@ -107,3 +107,4 @@ data/*
 *.rmarkdown
 
 Notebook.html
+*.Rproj
