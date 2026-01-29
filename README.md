@@ -12,7 +12,8 @@ https://swissdox.linguistik.uzh.ch/
 ## Setup
 
 1) Install [**Quarto**](https://quarto.org/) (required to render the main notebook).  
-2) Create a local environment file with your API credentials.
+2) Create a local environment file with your API credentials.  
+3) Ensure `quanteda` and `word2vec` are running with multithreading enabled (see note below).
 
 ### Local environment file
 
@@ -21,6 +22,16 @@ Copy `local.env.example` to `local.env` and add your Swissdox credentials:
 ```
 cp local.env.example local.env
 ```
+
+### Data directory note
+
+The `/data` directory is intentionally empty in the repository. The raw Swissdox exports are extremely large (multi‑GB) and exceed GitHub limits. With API access, you can reproduce the calls locally and rebuild the datasets.
+
+
+> [!IMPORTANT]
+> **Performance note**
+>
+> We strongly recommend enabling multithreading for both `quanteda` and `word2vec`. On some systems, `quanteda` requires additional configuration to allow parallel execution; otherwise tokenization and DFM construction can take hours. The notebook includes a short check and a link to the official setup guide.
 
 ## Main analysis
 
